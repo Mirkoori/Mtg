@@ -160,10 +160,8 @@ function updateSummary() {
 }
 
 // ---- aggiunta al carrello
-$('btnAdd').onclick = async () => {
-  const sel = selected(); if (!sel.length) return;
-  const cards = sel.reduce((a, i) => a + i.qty, 0);
-  if (!confirm(`Aggiungo ${cards} carte al tuo carrello Cardtrader (CardTrader Zero).\nNon viene acquistato nulla: il pagamento lo fai tu dal sito.\n\nProcedo?`)) return;
+let addTotals = { ok: 0, rows: 0 };
+async function runAdd(sel, isRetry) {
   $('btnAdd').disabled = true; $('btnPreview').disabled = true;
   const prog = $('prog'); prog.hidden = false; prog.max = sel.length; prog.value = 0;
   $('result').innerHTML = '';
@@ -171,17 +169,30 @@ $('btnAdd').onclick = async () => {
   let ok = 0; const fails = [];
   for (let i = 0; i < sel.length; i++) {
     const it = sel[i];
-    say('msgAdd', `Aggiungo ${i + 1}/${sel.length}: ${it.name_it}`);
+    say('msgAdd', `${isRetry ? 'Riprovo' : 'Aggiungo'} ${i + 1}/${sel.length}: ${it.name_it}`);
     try { await Core.cartAdd(token(), it.product_id, it.qty); ok++; }
     catch (e) { fails.push({ it, msg: e.message }); }
-    prog.value = i + 1; await sleep(150);
+    prog.value = i + 1; await sleep(isRetry ? 400 : 150);
   }
   let after = null; try { after = await Core.cart(token()); } catch (e) {}
   say('msgAdd', '');
-  let html = `<p class="msg ${fails.length ? 'warn' : 'ok'}" style="font-size:14px">Aggiunte ${ok} righe su ${sel.length}.` +
-    (after ? ` Il carrello ora contiene ${after.items} carte${after.subtotal ? ' (' + money(after.subtotal.cents, after.subtotal.currency) + ')' : ''}${before && before.items ? `, di cui ${before.items} c'erano gi\u00e0` : ''}.` : '') + '</p>';
-  if (fails.length) html += '<details open><summary>Non aggiunte</summary>' + fails.map(f => `<div>${esc(f.it.name_it)} <span class="en">\u2014 ${esc(f.msg)}</span></div>`).join('') + '</details>';
+  addTotals.ok += ok;
+  let html = `<p class="msg ${fails.length ? 'warn' : 'ok'}" style="font-size:14px">Aggiunte ${addTotals.ok} righe su ${addTotals.rows}.` +
+    (after ? ` Il carrello ora contiene ${after.items} carte${after.subtotal ? ' (' + money(after.subtotal.cents, after.subtotal.currency) + ')' : ''}${before && before.items && !isRetry ? `, di cui ${before.items} c'erano gi\u00e0` : ''}.` : '') + '</p>';
+  if (fails.length) {
+    html += '<details open><summary>Non aggiunte (' + fails.length + ')</summary>' + fails.map(f => `<div>${esc(f.it.name_it)} <span class="en">\u2014 ${esc(f.msg)}</span></div>`).join('') + '</details>';
+    html += '<div class="actions"><button id="btnRetry" class="secondary">Riprova solo le ' + fails.length + ' non aggiunte</button></div>';
+  }
   html += '<p><a href="https://www.cardtrader.com/cart" target="_blank" rel="noopener">Apri il carrello su Cardtrader \u2192</a></p>';
   $('result').innerHTML = html;
+  const rb = $('btnRetry');
+  if (rb) rb.onclick = () => runAdd(fails.map(f => f.it), true);
   $('btnAdd').disabled = false; $('btnPreview').disabled = false;
+}
+$('btnAdd').onclick = async () => {
+  const sel = selected(); if (!sel.length) return;
+  const cards = sel.reduce((a, i) => a + i.qty, 0);
+  if (!confirm(`Aggiungo ${cards} carte al tuo carrello Cardtrader (CardTrader Zero).\nNon viene acquistato nulla: il pagamento lo fai tu dal sito.\n\nProcedo?`)) return;
+  addTotals = { ok: 0, rows: sel.length };
+  runAdd(sel, false);
 };
