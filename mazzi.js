@@ -72,10 +72,10 @@ async function searchPages(q, maxPages) {
   return data;
 }
 
-async function searchCards(q, onlyLegal, fmtScry) {
+async function searchCards(q, onlyLegal, fmtScry, extra) {
   const base = q.trim();
   if (!base) return [];
-  const legal = onlyLegal && fmtScry ? ' f:' + fmtScry : '';
+  const legal = (onlyLegal && fmtScry ? ' f:' + fmtScry : '') + (extra ? ' ' + extra : '');
   const out = [], seen = new Set();
   const add = list => list.forEach(c => { const s = slim(c); if (!seen.has(s.id)) { seen.add(s.id); out.push(s); } });
   const queries = [];
@@ -329,7 +329,8 @@ document.addEventListener('click', ev => {
     Deck.setQty(d, e.id, e.section, e.qty + (act === 'inc' ? 1 : -1)); save(); render();
   } else if (act === 'open') { ev.preventDefault(); openModal(t.dataset.id, t.dataset.sec); }
   else if (act === 'addto') {
-    ev.preventDefault(); S.target = t.dataset.sec; renderTargetSelect(d); openSearch();
+    ev.preventDefault(); const was = S.target; S.target = t.dataset.sec; renderTargetSelect(d); openSearch();
+    if ($('q').value.trim() && (was === 'commander' || S.target === 'commander')) doSearch();
   } else if (act === 'ropen') { const c = S.results[+t.dataset.i]; S.cards[c.id] = Object.assign(S.cards[c.id] || {}, c); openModal(c.id, null); }
   else if (act === 'radd') { addToDeck(S.results[+t.dataset.i], $('target').value); }
 });
@@ -339,7 +340,10 @@ document.addEventListener('keydown', ev => { if (ev.key === 'Escape') closeModal
 function openSearch() { $('searchPanel').hidden = false; $('q').focus(); $('searchPanel').scrollIntoView({ behavior: 'smooth', block: 'start' }); }
 $('btnSearch').onclick = () => { $('searchPanel').hidden ? openSearch() : ($('searchPanel').hidden = true); };
 $('closeSearch').onclick = () => { $('searchPanel').hidden = true; };
-$('target').onchange = () => { S.target = $('target').value; };
+$('target').onchange = () => {
+  const was = S.target; S.target = $('target').value;
+  if (($('q').value.trim()) && (was === 'commander' || S.target === 'commander')) doSearch(); // il comandante ha una ricerca a parte
+};
 
 async function doSearch() {
   const d = deck(); if (!d) return;
@@ -347,10 +351,11 @@ async function doSearch() {
   const seq = ++S.searchSeq;
   say('searchMsg', 'Cerco\u2026'); $('results').innerHTML = '';
   try {
-    const res = await searchCards(q, $('onlyLegal').checked, fmtOf(d).scry);
+    const cmdr = $('target').value === 'commander' ? (fmtOf(d).scry === 'brawl' ? 'is:brawler' : 'is:commander') : '';
+    const res = await searchCards(q, $('onlyLegal').checked, fmtOf(d).scry, cmdr);
     if (seq !== S.searchSeq) return;
     S.results = res; S.shown = 60;
-    say('searchMsg', res.length ? `${res.length} carte trovate` : 'Nessuna carta trovata. Prova con parole diverse o la sintassi di Scryfall.');
+    say('searchMsg', res.length ? `${res.length} carte trovate${cmdr ? ' (solo possibili comandanti)' : ''}` : (cmdr ? 'Nessun possibile comandante trovato (solo creature leggendarie e simili).' : 'Nessuna carta trovata. Prova con parole diverse o la sintassi di Scryfall.'));
     renderResults();
   } catch (e) { if (seq === S.searchSeq) say('searchMsg', e.message); }
 }
