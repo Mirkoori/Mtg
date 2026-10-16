@@ -100,6 +100,7 @@ function collect() {
     rarities: [...document.querySelectorAll('#rarities input:checked')].map(i => i.value),
     copies: parseInt($('copies').value) || 1, owned_mode: $('ownedMode').value, owned: state.owned,
     language_mode: $('langMode').value, min_condition: $('cond').value, foil: $('foil').value,
+    colors: [...document.querySelectorAll('#colors input:checked')].map(i => i.value),
     max_price: parseFloat($('maxPrice').value) || 0, dedupe: $('dedupe').checked,
   };
 }
@@ -113,16 +114,25 @@ $('btnPreview').onclick = async () => {
     state.plan = await Core.buildPlan(token(), req, t => say('msgPreview', t));
     state.planOpts = req;
     renderPlan();
-    if (state.plan.italian_names) say('msgPreview', ''); else say('msgPreview', 'Nomi italiani non disponibili: mostro quelli inglesi.', 'warn');
+    if (state.plan.color_unavailable) say('msgPreview', 'Colori non disponibili per alcune carte: quelle non sono state filtrate per colore.', 'warn');
+    else if (!state.plan.italian_names) say('msgPreview', 'Nomi italiani non disponibili: mostro quelli inglesi.', 'warn');
+    else say('msgPreview', '');
   } catch (e) { say('msgPreview', e.message, 'err'); }
   $('btnPreview').disabled = false;
 };
+const COLOR_IT = { W: 'Bianco', U: 'Blu', B: 'Nero', R: 'Rosso', G: 'Verde', C: 'Incolore' };
+function colorLabel(c) {
+  if (!c) return '';
+  if (c.startsWith('M:')) return [...c.slice(2)].map(x => COLOR_IT[x] || x).join('/');
+  return COLOR_IT[c] || c;
+}
 function renderPlan() {
   const p = state.plan; $('previewBox').hidden = false;
   $('rows').innerHTML = p.items.map((it, i) => `<tr>
     <td><input type="checkbox" data-i="${i}" checked></td>
     <td>${esc(it.name_it)}${it.version ? ' <span class="en">(' + esc(it.version) + ')</span>' : ''}${it.name_it !== it.name_en ? '<div class="en">' + esc(it.name_en) + '</div>' : ''}</td>
     <td class="hide-sm">${esc(it.collector_number || '')}</td>
+    <td class="hide-sm">${esc(colorLabel(it.color))}</td>
     <td class="hide-sm">${esc(it.condition)} \u00b7 ${esc((it.language || '').toUpperCase())}${it.foil ? ' \u00b7 foil' : ''}</td>
     <td class="num">${it.qty}</td><td class="num">${money(it.price_cents, it.currency)}</td></tr>`).join('');
   $('rows').querySelectorAll('input').forEach(c => c.onchange = updateSummary);

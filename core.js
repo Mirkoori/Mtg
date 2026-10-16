@@ -130,6 +130,48 @@ const Core = (() => {
       return names;
     });
   }
+  // ---- colori (Scryfall, inglese: copre tutte le carte del set)
+  function colorCode(cols) {
+    cols = (cols || []).filter(Boolean);
+    return cols.length === 0 ? 'C' : cols.length === 1 ? cols[0] : 'M:' + cols.join('');
+  }
+  async function colorMap(setCode) {
+    const code = (setCode || '').toLowerCase();
+    if (!code) return {};
+    return cached('col' + code, 3600000, async () => {
+      const out = {};
+      let url = config.scryBase + '/cards/search?' + new URLSearchParams({ q: `set:${code}`, unique: 'cards', order: 'set' });
+      let pages = 0;
+      try {
+        while (url && pages < 25) {
+          const d = await httpJson('GET', url, { retries: 1 });
+          for (const c of d.data || []) {
+            let cols = c.colors;
+            if (!cols && c.card_faces && c.card_faces[0]) cols = c.card_faces[0].colors;
+            if (c.name) for (const k of nameKeys(c.name)) if (!(k in out)) out[k] = colorCode(cols);
+          }
+          url = d.has_more ? d.next_page : null;
+          pages++;
+          await sleep(120);
+        }
+      } catch (e) { /* senza colori il filtro viene ignorato */ }
+      return out;
+    });
+  }
+  function bpColor(b) {
+    let v = bpProps(b).mtg_card_colors;
+    if (v === undefined || v === null || v === '') return null;
+    if (typeof v === 'string') v = v.split(/[,\s]+/);
+    v = v.map(x => String(x).trim().toUpperCase()).filter(x => 'WUBRG'.includes(x) && x);
+    return colorCode(v);
+  }
+  function colorMatches(code, wanted) {
+    if (!code) return false;
+    if (code === 'C') return wanted.has('C');
+    if (code.startsWith('M:')) return wanted.has('M') || [...code.slice(2)].some(x => wanted.has(x));
+    return wanted.has(code);
+  }
+
   function italianFor(nameEn, map) {
     for (const k of nameKeys(nameEn)) if (k in map) return map[k];
     return null;
@@ -233,6 +275,19 @@ const Core = (() => {
       groups.get(key).push(b);
     }
 
+    const wantedColors = new Set((p.colors || []).map(x => String(x).toUpperCase()));
+    let colorUnavailable = false;
+    if (wantedColors.size) {
+      progress('Scarico i colori delle carte\u2026');
+      const cm = await colorMap(code);
+      for (const [key, list] of [...groups.entries()]) {
+        const known = list.map(bpColor).find(Boolean) || italianFor(list[0].name || '', cm);
+        if (!known) { colorUnavailable = true; continue; }
+        if (!colorMatches(known, wantedColors)) groups.delete(key);
+        else list.forEach(b => { b._color = known; });
+      }
+    }
+
     progress('Scarico i nomi italiani\u2026');
     const own = parseOwned(p.owned);
     const itMap = await italianNames(code);
@@ -259,7 +314,7 @@ const Core = (() => {
       items.push({
         name_it: nameIt, name_en: nameEn, version: b.version || null,
         collector_number: bpProps(b).collector_number || null, rarity: rarityOf(b),
-        blueprint_id: b.id, product_id: pr.id, qty: need, have,
+        color: b._color || bpColor(b) || null, blueprint_id: b.id, product_id: pr.id, qty: need, have,
         price_cents: pr.price.cents, currency: pr.price.currency || 'EUR',
         condition: ph.condition, language: ph.mtg_language, foil: !!ph.mtg_foil,
       });
@@ -270,7 +325,7 @@ const Core = (() => {
       items, missing, skipped_owned: skippedOwned,
       total_cents: items.reduce((a, i) => a + i.price_cents * i.qty, 0),
       currency: items.length ? items[0].currency : 'EUR',
-      italian_names: Object.keys(itMap).length > 0,
+      italian_names: Object.keys(itMap).length > 0, color_unavailable: colorUnavailable,
     };
   }
 

@@ -145,6 +145,16 @@
         <input id="maxPrice" type="number" min="0" step="0.05" value="0" inputmode="decimal">
       </div>
     </div>
+    <label>Colore (nessuno selezionato = tutti)</label>
+    <div id="colors" class="chips">
+      <label class="chip"><input type="checkbox" value="W">Bianco</label>
+      <label class="chip"><input type="checkbox" value="U">Blu</label>
+      <label class="chip"><input type="checkbox" value="B">Nero</label>
+      <label class="chip"><input type="checkbox" value="R">Rosso</label>
+      <label class="chip"><input type="checkbox" value="G">Verde</label>
+      <label class="chip"><input type="checkbox" value="C">Incolore</label>
+      <label class="chip"><input type="checkbox" value="M">Multicolore</label>
+    </div>
     <div class="hint">Con CardTrader Zero le spedizioni le fa Cardtrader in un unico pacco, quindi per ogni carta viene scelta semplicemente l'offerta pi&#249; economica.</div>
     <div class="check"><input id="dedupe" type="checkbox" checked><label for="dedupe">Una sola versione per carta (ignora showcase, borderless ed extended art doppie)</label></div>
   </section>
@@ -158,7 +168,7 @@
     <div id="previewBox" hidden>
       <div class="summary" id="summary"></div>
       <div class="tablewrap"><table>
-        <thead><tr><th></th><th>Carta</th><th class="hide-sm">N&#176;</th><th class="hide-sm">Cond. / Lingua</th><th class="num">Qt&#224;</th><th class="num">Prezzo</th></tr></thead>
+        <thead><tr><th></th><th>Carta</th><th class="hide-sm">N&#176;</th><th class="hide-sm">Colore</th><th class="hide-sm">Cond. / Lingua</th><th class="num">Qt&#224;</th><th class="num">Prezzo</th></tr></thead>
         <tbody id="rows"></tbody>
       </table></div>
       <details id="missingBox" hidden><summary id="missingSum"></summary><div id="missingList"></div></details>
