@@ -63,17 +63,29 @@ function slim(c) {
   };
 }
 
+async function searchPages(q, maxPages) {
+  const params = '?' + new URLSearchParams({ q, unique: 'cards', order: 'name' }).toString();
+  let r = await scry('/cards/search' + params);
+  const data = (r.data || []).slice();
+  let pages = 1;
+  while (r.has_more && r.next_page && pages < maxPages) { r = await scry(r.next_page); data.push(...(r.data || [])); pages++; }
+  return data;
+}
+
 async function searchCards(q, onlyLegal, fmtScry) {
-  let base = q.trim();
+  const base = q.trim();
   if (!base) return [];
-  if (onlyLegal && fmtScry) base += ' f:' + fmtScry;
-  const params = e => '?' + new URLSearchParams({ q: e, unique: 'cards', order: 'name' }).toString();
+  const legal = onlyLegal && fmtScry ? ' f:' + fmtScry : '';
   const out = [], seen = new Set();
   const add = list => list.forEach(c => { const s = slim(c); if (!seen.has(s.id)) { seen.add(s.id); out.push(s); } });
-  const it = await scry('/cards/search' + params(base + ' lang:it'));
-  add(it.data || []);
-  const en = await scry('/cards/search' + params(base));
-  add(en.data || []);
+  const queries = [];
+  const typeEn = /[:=<>!"]/.test(base) ? [] : Deck.typeWordsEn(base);
+  if (typeEn.length) queries.push(typeEn.map(t => 't:' + t).join(' ') + legal); // per tipo (es. chierico -> t:cleric)
+  queries.push(base + legal);                                                   // per nome
+  for (const qq of queries) {
+    add(await searchPages(qq + ' lang:it', 4));  // stampe italiane (nomi e testi in italiano)
+    add(await searchPages(qq, 4));               // tutte le altre carte, anche senza stampa italiana
+  }
   return out;
 }
 

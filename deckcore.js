@@ -206,6 +206,33 @@ const Deck = (() => {
     return name ? [{ qty, name, mode }] : [];
   }
 
-  return { SECTIONS, MAIN, FORMATS, classify, emptyDeck, entries, count, mainCount, addCard, setQty, moveCard, stats, check, exportText, parseList, colorPips, isLand, isBasic };
+  // parole italiane di tipo/sottotipo -> inglese (per cercare per tipo)
+  const TYPE_IT = {
+    angelo: 'angel', soldato: 'soldier', chierico: 'cleric', guerriero: 'warrior', mago: 'wizard', stregone: 'sorcerer', ladro: 'rogue',
+    elfo: 'elf', nano: 'dwarf', goblin: 'goblin', umano: 'human', drago: 'dragon', demone: 'demon', vampiro: 'vampire', zombie: 'zombie',
+    spirito: 'spirit', bestia: 'beast', uccello: 'bird', gatto: 'cat', cane: 'dog', lupo: 'wolf', cavaliere: 'knight', arciere: 'archer',
+    monaco: 'monk', pirata: 'pirate', dinosauro: 'dinosaur', tritone: 'merfolk', elementale: 'elemental', gigante: 'giant', orco: 'orc',
+    mezzuomo: 'halfling', scheletro: 'skeleton', serpente: 'snake', ragno: 'spider', insetto: 'insect', pesce: 'fish', rettile: 'lizard',
+    topo: 'rat', cavallo: 'horse', creatura: 'creature', artefatto: 'artifact', incantesimo: 'enchantment', istantaneo: 'instant',
+    stregoneria: 'sorcery', terra: 'land', planeswalker: 'planeswalker', leggendario: 'legendary', equipaggiamento: 'equipment',
+    eroe: 'hero', assassino: 'assassin', druido: 'druid', sacerdote: 'cleric', samurai: 'samurai', ninja: 'ninja', fenice: 'phoenix',
+    idra: 'hydra', sfinge: 'sphinx', unicorno: 'unicorn', verme: 'worm', golem: 'golem', costrutto: 'construct', fata: 'faerie',
+    bardo: 'bard', berserker: 'berserker', cacciatore: 'hunter', sciamano: 'shaman', chimera: 'chimera', gorgone: 'gorgon',
+  };
+  function typeWordsEn(query) { // restituisce i tipi inglesi se TUTTE le parole sono tipi noti, altrimenti []
+    const words = String(query || '').toLowerCase().split(/\s+/).filter(Boolean);
+    if (!words.length) return [];
+    const out = [];
+    for (const w0 of words) {
+      let w = w0, hit = TYPE_IT[w];
+      if (!hit && /[ie]$/.test(w)) hit = TYPE_IT[w.slice(0, -1) + (w.endsWith('i') ? 'o' : 'a')];
+      if (!hit && /[a-z]{4,}/.test(w) && /^[a-z]+$/.test(w)) { /* parola inglese: va bene come tipo se e' un tipo noto */ if (Object.values(TYPE_IT).includes(w)) hit = w; }
+      if (!hit) return [];
+      out.push(hit);
+    }
+    return out;
+  }
+
+  return { typeWordsEn, SECTIONS, MAIN, FORMATS, classify, emptyDeck, entries, count, mainCount, addCard, setQty, moveCard, stats, check, exportText, parseList, colorPips, isLand, isBasic };
 })();
 if (typeof module !== 'undefined') module.exports = Deck;
