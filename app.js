@@ -37,6 +37,13 @@ $('btnConnect').onclick = async () => {
 };
 
 // ---- 2. CSV
+function nameKeysSafe(n) {
+  const full = String(n || '').trim().toLowerCase();
+  const out = new Set([full]);
+  if (full.includes('//')) full.split('//').forEach(p => out.add(p.trim()));
+  out.delete('');
+  return [...out];
+}
 function parseCSV(text, delim) {
   const rows = []; let row = [], f = '', q = false;
   for (let i = 0; i < text.length; i++) {
@@ -63,6 +70,11 @@ $('csv').onchange = async ev => {
   if (iName < 0) { state.owned = []; return say('msgCsv', 'Colonna "Card Name" non trovata nel file.', 'err'); }
   state.owned = rows.filter(r => r[iName]).map(r => ({
     name: r[iName], set: iSet >= 0 ? r[iSet] : '', qty: iQty >= 0 ? (parseInt(r[iQty]) || 1) : 1 }));
+  try { // salva l'elenco delle carte possedute per la pagina Mazzi
+    const om = {};
+    state.owned.forEach(o => nameKeysSafe(o.name).forEach(k => { om[k] = (om[k] || 0) + o.qty; }));
+    store.set('mtg_owned', JSON.stringify(om));
+  } catch (e) {}
   const unique = new Set(state.owned.map(o => o.name.toLowerCase())).size;
   say('msgCsv', `Caricate ${state.owned.reduce((a, o) => a + o.qty, 0)} carte (${unique} nomi diversi).`, 'ok');
 };

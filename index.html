@@ -56,11 +56,15 @@
   .hint { font-size:12.5px; color:var(--muted); margin-top:4px; }
   .badge { font-size:12px; background:var(--bg); border:1px solid var(--line); border-radius:6px; padding:2px 8px; color:var(--muted); }
   a { color:var(--accent); }
+  nav { display:flex; gap:6px; margin-bottom:12px; }
+  nav a { padding:7px 14px; border-radius:999px; border:1px solid var(--line); text-decoration:none; color:var(--ink); background:var(--card); font-weight:600; font-size:14px; }
+  nav a.on { background:var(--accent); color:var(--accent-ink); border-color:var(--accent); }
   @media (max-width:520px) { .hide-sm { display:none; } }
 </style>
 </head>
 <body>
 <main>
+  <nav><a href="index.html" class="on">Carrello</a><a href="mazzi.html">Mazzi</a></nav>
   <h1>Cardtrader Cart Filler</h1>
   <p class="sub">Riempie il carrello Cardtrader con le carte che ti mancano, solo CardTrader Zero. Non acquista mai nulla.</p>
 

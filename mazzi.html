@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#1f5f4a">
+<title>Mazzi Magic</title>
+<style>
+  :root {
+    --bg:#f5f4f0; --card:#ffffff; --ink:#1d1d1b; --muted:#6b6a64; --line:#e3e1d9;
+    --accent:#1f5f4a; --accent-ink:#ffffff; --warn:#a15c00; --bad:#b3261e; --ok:#1f7a4d;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#161715; --card:#1f201e; --ink:#ecebe6; --muted:#9b9a93; --line:#33342f;
+      --accent:#4fb08c; --accent-ink:#0d1f18; --warn:#e0a24a; --bad:#f2837b; --ok:#6cd09c; }
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; }
+  body.noscroll { overflow:hidden; }
+  main { max-width:960px; margin:0 auto; padding:14px 12px 90px; }
+  nav { display:flex; gap:6px; margin-bottom:12px; }
+  nav a { padding:7px 14px; border-radius:999px; border:1px solid var(--line); text-decoration:none; color:var(--ink); background:var(--card); font-weight:600; font-size:14px; }
+  nav a.on { background:var(--accent); color:var(--accent-ink); border-color:var(--accent); }
+  h1 { font-size:21px; margin:0 0 10px; }
+  section, .panel { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:12px 14px; margin-bottom:12px; }
+  select, input[type=text], textarea { width:100%; padding:9px 10px; border:1px solid var(--line); border-radius:8px; background:var(--bg); color:var(--ink); font:inherit; font-size:16px; }
+  textarea { min-height:140px; }
+  button { font:inherit; padding:8px 14px; border-radius:8px; border:1px solid var(--accent); background:var(--accent); color:var(--accent-ink); cursor:pointer; font-weight:600; }
+  button.secondary { background:transparent; color:var(--accent); }
+  button.link { background:none; border:none; padding:0; color:var(--accent); text-decoration:underline; font-weight:500; }
+  button:disabled { opacity:.45; }
+  .row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-top:8px; }
+  .row > select { width:auto; flex:1 1 150px; }
+  .seg button { border-radius:0; background:transparent; color:var(--accent); padding:6px 12px; }
+  .seg button.on { background:var(--accent); color:var(--accent-ink); }
+  .seg { display:inline-flex; border:1px solid var(--accent); border-radius:8px; overflow:hidden; }
+  .msg { font-size:13px; color:var(--muted); }
+  label.chk { display:flex; gap:6px; align-items:center; font-size:14px; }
+  label.chk input { width:auto; }
+  details > summary { cursor:pointer; }
+  /* riepilogo */
+  .big { font-size:20px; } .big b { font-size:26px; }
+  .sub2 { color:var(--muted); font-size:13px; margin-top:2px; }
+  .bars { margin-top:10px; }
+  .barrow { display:grid; grid-template-columns:130px 1fr 28px 54px; gap:8px; align-items:center; font-size:13px; margin:4px 0; }
+  .bt { position:relative; height:10px; background:var(--bg); border-radius:5px; border:1px solid var(--line); }
+  .bf { position:absolute; left:0; top:0; bottom:0; border-radius:5px; } .bi { position:absolute; top:-3px; bottom:-3px; width:2px; background:var(--ink); opacity:.5; }
+  .bf.ok, .dot.ok { background:var(--ok); } .bf.warn, .dot.warn { background:var(--warn); } .bf.bad, .dot.bad { background:var(--bad); }
+  .bn { text-align:right; font-weight:700; } .bn.ok { color:var(--ok); } .bn.warn { color:var(--warn); } .bn.bad { color:var(--bad); }
+  .br { color:var(--muted); font-size:12px; }
+  .dot { display:inline-block; width:9px; height:9px; border-radius:50%; margin-right:5px; }
+  .curve { display:flex; gap:6px; align-items:flex-end; height:90px; margin-top:12px; }
+  .cc { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:flex-end; height:100%; position:relative; padding-bottom:16px; }
+  .cb { width:100%; background:var(--accent); border-radius:4px 4px 0 0; min-height:2px; opacity:.85; }
+  .cn { font-size:11px; color:var(--muted); } .cl { position:absolute; bottom:0; font-size:11px; color:var(--muted); }
+  .pipsrow { margin-top:8px; font-size:13px; color:var(--muted); }
+  .warns { margin:10px 0 0; padding-left:18px; font-size:13px; } .warns li.warn { color:var(--warn); } .warns li.info { color:var(--muted); } .warns li.ok { color:var(--ok); }
+  /* mana */
+  .pip { display:inline-grid; place-items:center; min-width:17px; height:17px; border-radius:50%; font-size:10px; font-weight:700; margin:0 1px; padding:0 3px; color:#222; vertical-align:middle; }
+  .pW { background:#f6f1d0; } .pU { background:#a9d4ee; } .pB { background:#b9afa8; } .pR { background:#f4a58a; } .pG { background:#9bd3ae; } .pC, .pN, .pX { background:#d6d3cc; }
+  .sep { margin:0 4px; color:var(--muted); }
+  /* sezioni */
+  .sec { background:var(--card); border:1px solid var(--line); border-radius:12px; margin-bottom:10px; padding:0; }
+  .sec > summary { list-style:none; display:flex; gap:10px; align-items:center; padding:10px 14px; font-weight:700; }
+  .sec > summary::-webkit-details-marker { display:none; }
+  .si { color:var(--muted); font-weight:500; font-size:13px; margin-left:auto; } .si small { font-weight:400; }
+  .addbtn { padding:4px 10px; font-size:13px; white-space:nowrap; flex:none; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(98px,1fr)); gap:8px; padding:4px 12px 12px; }
+  .tile { position:relative; text-align:center; } .tile img { width:100%; border-radius:6px; display:block; }
+  .tile a, .rtile a, .lname { cursor:pointer; }
+  .noimg { aspect-ratio:488/680; border:1px solid var(--line); border-radius:6px; padding:6px; font-size:12px; display:grid; place-items:center; }
+  .qctl { display:inline-flex; align-items:center; gap:6px; margin-top:3px; }
+  .qctl button { padding:0; width:26px; height:26px; line-height:1; font-size:16px; border-radius:50%; background:var(--bg); color:var(--ink); border:1px solid var(--line); }
+  .own { position:absolute; top:3px; left:3px; font-size:11px; font-weight:700; border-radius:10px; padding:0 6px; background:#fff; border:1px solid var(--line); }
+  .own.y { color:var(--ok); } .own.p { color:var(--warn); } .own.n { color:var(--bad); }
+  .list { padding:0 12px 10px; } .lrow { display:flex; align-items:center; gap:8px; padding:5px 0; border-top:1px solid var(--line); }
+  .lname { flex:1; } .lmana { white-space:nowrap; } .lq .qctl { margin:0; }
+  .none { color:var(--muted); font-size:13px; padding:4px 14px 12px; }
+  /* ricerca */
+  .rgrid { display:grid; grid-template-columns:repeat(auto-fill,minmax(110px,1fr)); gap:10px; margin-top:10px; }
+  .rtile { text-align:center; } .rtile img { width:100%; border-radius:6px; }
+  .rn { font-size:12px; line-height:1.25; margin:3px 0; min-height:30px; } .rtile button { padding:4px 8px; font-size:13px; width:100%; }
+  /* modale */
+  #modal { position:fixed; inset:0; background:rgba(0,0,0,.6); z-index:20; overflow:auto; padding:14px; }
+  #mBox { background:var(--card); border-radius:14px; max-width:760px; margin:0 auto; padding:14px; position:relative; }
+  #mClose { position:absolute; top:6px; right:8px; background:transparent; color:var(--muted); border:none; font-size:24px; padding:2px 8px; }
+  #mBody { display:flex; gap:14px; flex-wrap:wrap; }
+  .mimg { flex:0 0 240px; max-width:100%; } .mimg img { width:100%; border-radius:10px; margin-bottom:6px; }
+  .minfo { flex:1 1 260px; min-width:0; } .minfo h3 { margin:0; font-size:19px; }
+  .en { color:var(--muted); font-size:12.5px; } .mm { margin:4px 0; } .cmc { color:var(--muted); font-size:12px; margin-left:6px; }
+  .otext { background:var(--bg); border-radius:8px; padding:8px 10px; margin:8px 0; font-size:14px; }
+  .meta { font-size:13px; color:var(--muted); margin-top:3px; } .okc { color:var(--ok); } .badc { color:var(--bad); }
+  .mact { display:flex; gap:8px; flex-wrap:wrap; margin-top:12px; } .mact select { width:auto; flex:1 1 140px; }
+  #toast { position:fixed; left:50%; bottom:22px; transform:translateX(-50%); background:#222; color:#fff; padding:9px 16px; border-radius:20px; font-size:14px; z-index:30; max-width:90%; text-align:center; }
+  #empty { text-align:center; color:var(--muted); padding:30px 10px; }
+  @media (max-width:520px) { .barrow { grid-template-columns:96px 1fr 24px 46px; } }
+</style>
+</head>
+<body>
+<main>
+  <nav><a href="index.html">Carrello</a><a href="mazzi.html" class="on">Mazzi</a></nav>
+  <h1>I miei mazzi</h1>
+
+  <section>
+    <div class="row" style="margin-top:0">
+      <select id="deckSel" aria-label="Mazzo"></select>
+      <select id="fmtSel" aria-label="Formato"></select>
+    </div>
+    <div class="row" id="deckTools" hidden>
+      <button id="btnSearch">Cerca e aggiungi carte</button>
+      <span class="seg"><button data-view="grid">Immagini</button><button data-view="list">Lista</button></span>
+      <button class="secondary" id="btnImport">Importa</button>
+      <button class="secondary" id="btnExport">Esporta</button>
+      <button class="secondary" id="btnRename">Rinomina</button>
+      <button class="secondary" id="btnDup">Duplica</button>
+      <button class="secondary" id="btnDel">Elimina</button>
+    </div>
+    <details id="newBox" style="margin-top:10px">
+      <summary>Nuovo mazzo</summary>
+      <form id="createForm" class="row">
+        <input id="newName" type="text" placeholder="Nome del mazzo" style="flex:2 1 180px" autocomplete="off">
+        <select id="newFmt" aria-label="Formato del nuovo mazzo"></select>
+        <button type="submit">Crea</button>
+      </form>
+    </details>
+    <div id="importBox" hidden style="margin-top:10px">
+      <div class="msg">Incolla un elenco (es. <i>4 Nome carta</i>, una per riga; con le righe <i>Commander</i> e <i>Sideboard</i> per le sezioni). Funzionano i nomi inglesi di Moxfield, Archidekt e simili.</div>
+      <textarea id="importText" placeholder="4 Lightning Bolt&#10;20 Mountain"></textarea>
+      <div class="row"><label class="chk"><input type="checkbox" id="importReplace"> Sostituisci il contenuto del mazzo</label><button id="doImport">Importa</button><span class="msg" id="importMsg"></span></div>
+    </div>
+  </section>
+
+  <section id="searchPanel" hidden>
+    <form id="searchForm" class="row" style="margin-top:0">
+      <input id="q" type="text" placeholder="Nome o testo, es. angelo, o t:angel c:w cmc&lt;=3" style="flex:3 1 220px" autocomplete="off" enterkeyhint="search">
+      <button type="submit">Cerca</button>
+      <button type="button" class="secondary" id="closeSearch">Chiudi</button>
+    </form>
+    <div class="row">
+      <label class="chk"><input type="checkbox" id="onlyLegal" checked> Solo carte legali nel formato</label>
+      <label class="chk" style="flex:1">Aggiungi a&nbsp;<select id="target"></select></label>
+    </div>
+    <div class="msg" id="searchMsg" style="margin-top:6px"></div>
+    <div class="rgrid" id="results"></div>
+    <div class="row"><button class="secondary" id="more" hidden>Mostra altre</button></div>
+  </section>
+
+  <div id="empty">Crea il tuo primo mazzo qui sopra (apri &laquo;Nuovo mazzo&raquo;), scegli il formato e inizia ad aggiungere carte.</div>
+
+  <div id="deckArea" hidden>
+    <section id="summary"></section>
+    <div id="sections"></div>
+  </div>
+</main>
+
+<div id="modal" hidden><div id="mBox"><button id="mClose" aria-label="Chiudi">&times;</button><div id="mBody"></div></div></div>
+<div id="toast" hidden></div>
+<script src="deckcore.js"></script>
+<script src="mazzi.js"></script>
+</body>
+</html>
