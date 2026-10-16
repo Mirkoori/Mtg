@@ -61,13 +61,17 @@ $('csv').onchange = async ev => {
   const file = ev.target.files[0]; if (!file) return;
   let text = (await file.text()).replace(/^\ufeff/, '');
   let delim = ',';
+  const first = text.split('\n', 1)[0];
+  if (!first.includes(',')) { if (first.includes(';')) delim = ';'; else if (first.includes('\t')) delim = '\t'; }
   const m = /^"?sep=(.)"?$/i.exec(text.split('\n', 1)[0].trim());
   if (m) { delim = m[1]; text = text.slice(text.indexOf('\n') + 1); }
   const rows = parseCSV(text, delim).filter(r => r.length > 1);
   const head = rows.shift() || [];
   const ix = n => head.findIndex(h => h.trim().toLowerCase() === n);
-  const iName = ix('card name'), iSet = ix('set code'), iQty = ix('quantity');
-  if (iName < 0) { state.owned = []; return say('msgCsv', 'Colonna "Card Name" non trovata nel file.', 'err'); }
+  const ixAny = names => { for (const n of names) { const i = ix(n); if (i >= 0) return i; } return -1; };
+  const iName = ixAny(['card name', 'name', 'nome', 'nome carta']), iSet = ixAny(['set code', 'set', 'edition', 'edizione']),
+    iQty = ixAny(['quantity', 'qty', 'count', 'quantita']);
+  if (iName < 0) { state.owned = []; return say('msgCsv', 'Colonna del nome non trovata (cerco "Card Name" o "Name"). Colonne trovate: ' + head.map(h => h.trim()).join(', ') + '', 'err'); }
   state.owned = rows.filter(r => r[iName]).map(r => ({
     name: r[iName], set: iSet >= 0 ? r[iSet] : '', qty: iQty >= 0 ? (parseInt(r[iQty]) || 1) : 1 }));
   try { // salva l'elenco delle carte possedute per la pagina Mazzi
