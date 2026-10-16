@@ -107,11 +107,11 @@ const Core = (() => {
   }
 
   // ---- nomi italiani (Scryfall)
-  async function italianNames(setCode) {
+  async function itData(setCode) {
     const code = (setCode || '').toLowerCase();
-    if (!code) return {};
+    if (!code) return { names: {}, types: {} };
     return cached('it' + code, 3600000, async () => {
-      const names = {};
+      const names = {}, types = {};
       let url = config.scryBase + '/cards/search?' + new URLSearchParams({ q: `set:${code} lang:it`, unique: 'prints', order: 'set' });
       let pages = 0;
       try {
@@ -120,26 +120,30 @@ const Core = (() => {
           for (const c of d.data || []) {
             let pn = c.printed_name;
             if (!pn && c.card_faces) pn = c.card_faces.map(f => f.printed_name || f.name || '').join(' // ');
-            if (pn && c.name) for (const k of nameKeys(c.name)) if (!(k in names)) names[k] = pn;
+            let pt = c.printed_type_line;
+            if (!pt && c.card_faces) pt = c.card_faces.map(f => f.printed_type_line || '').join(' // ');
+            if (pn && c.name) for (const k of nameKeys(c.name)) { if (!(k in names)) names[k] = pn; if (pt && !(k in types)) types[k] = pt; }
           }
           url = d.has_more ? d.next_page : null;
           pages++;
           await sleep(120);
         }
       } catch (e) { /* senza nomi italiani si usano quelli inglesi */ }
-      return names;
+      return { names, types };
     });
   }
+  const italianNames = async setCode => (await itData(setCode)).names;
+
   // ---- colori (Scryfall, inglese: copre tutte le carte del set)
   function colorCode(cols) {
     cols = (cols || []).filter(Boolean);
     return cols.length === 0 ? 'C' : cols.length === 1 ? cols[0] : 'M:' + cols.join('');
   }
-  async function colorMap(setCode) {
+  async function enData(setCode) {
     const code = (setCode || '').toLowerCase();
-    if (!code) return {};
+    if (!code) return { colors: {}, types: {} };
     return cached('col' + code, 3600000, async () => {
-      const out = {};
+      const colors = {}, types = {};
       let url = config.scryBase + '/cards/search?' + new URLSearchParams({ q: `set:${code}`, unique: 'cards', order: 'set' });
       let pages = 0;
       try {
@@ -148,15 +152,40 @@ const Core = (() => {
           for (const c of d.data || []) {
             let cols = c.colors;
             if (!cols && c.card_faces && c.card_faces[0]) cols = c.card_faces[0].colors;
-            if (c.name) for (const k of nameKeys(c.name)) if (!(k in out)) out[k] = colorCode(cols);
+            let tl = c.type_line;
+            if (!tl && c.card_faces) tl = c.card_faces.map(f => f.type_line || '').join(' // ');
+            if (c.name) for (const k of nameKeys(c.name)) { if (!(k in colors)) colors[k] = colorCode(cols); if (tl && !(k in types)) types[k] = tl; }
           }
           url = d.has_more ? d.next_page : null;
           pages++;
           await sleep(120);
         }
-      } catch (e) { /* senza colori il filtro viene ignorato */ }
-      return out;
+      } catch (e) { /* senza questi dati i filtri vengono ignorati */ }
+      return { colors, types };
     });
+  }
+  const colorMap = async setCode => (await enData(setCode)).colors;
+  // italiano -> inglese per i tipi piu' comuni (il filtro cerca in entrambe le lingue)
+  const TYPE_IT = {
+    angelo: 'angel', soldato: 'soldier', chierico: 'cleric', guerriero: 'warrior', mago: 'wizard', stregone: 'sorcerer',
+    ladro: 'rogue', 'ladro di': 'rogue', elfo: 'elf', nano: 'dwarf', goblin: 'goblin', umano: 'human', drago: 'dragon',
+    demone: 'demon', vampiro: 'vampire', zombie: 'zombie', spirito: 'spirit', bestia: 'beast', uccello: 'bird',
+    gatto: 'cat', cane: 'dog', lupo: 'wolf', 'lupo mannaro': 'werewolf', cavaliere: 'knight', arciere: 'archer',
+    monaco: 'monk', chierici: 'cleric', pirata: 'pirate', dinosauro: 'dinosaur', tritone: 'merfolk', sirena: 'merfolk',
+    elementale: 'elemental', gigante: 'giant', orco: 'orc', hobbit: 'halfling', mezzuomo: 'halfling', scheletro: 'skeleton',
+    serpente: 'snake', ragno: 'spider', insetto: 'insect', pesce: 'fish', rettile: 'lizard', topo: 'rat', cavallo: 'horse',
+    creatura: 'creature', artefatto: 'artifact', incantesimo: 'enchantment', istantaneo: 'instant', stregoneria: 'sorcery',
+    terra: 'land', planeswalker: 'planeswalker', leggendario: 'legendary', equipaggiamento: 'equipment', aura: 'aura',
+    eroe: 'hero', assassino: 'assassin', druido: 'druid', sacerdote: 'cleric', samurai: 'samurai', ninja: 'ninja',
+  };
+  function textFilter(raw) {
+    return String(raw || '').split(/[,;]+/).map(t => norm(t)).filter(Boolean)
+      .map(t => ({ words: t.split(' ').filter(Boolean) }));
+  }
+  function textMatches(terms, mode, hay) { // hay: testo gia' normalizzato
+    if (!terms.length) return true;
+    const test = t => t.words.every(w => hay.includes(w) || (TYPE_IT[w] && hay.includes(TYPE_IT[w])));
+    return mode === 'all' ? terms.every(test) : terms.some(test);
   }
   function bpColor(b) {
     let v = bpProps(b).mtg_card_colors;
@@ -276,21 +305,35 @@ const Core = (() => {
     }
 
     const wantedColors = new Set((p.colors || []).map(x => String(x).toUpperCase()));
-    let colorUnavailable = false;
-    if (wantedColors.size) {
-      progress('Scarico i colori delle carte\u2026');
-      const cm = await colorMap(code);
-      for (const [key, list] of [...groups.entries()]) {
-        const known = list.map(bpColor).find(Boolean) || italianFor(list[0].name || '', cm);
-        if (!known) { colorUnavailable = true; continue; }
-        if (!colorMatches(known, wantedColors)) groups.delete(key);
-        else list.forEach(b => { b._color = known; });
-      }
-    }
+    const terms = textFilter(p.text_filter);
+    const textMode = p.text_mode === 'all' ? 'all' : 'any';
+    let colorUnavailable = false, textUnavailable = false;
 
     progress('Scarico i nomi italiani\u2026');
     const own = parseOwned(p.owned);
-    const itMap = await italianNames(code);
+    const it = await itData(code);
+    const itMap = it.names;
+    let en = { colors: {}, types: {} };
+    if (wantedColors.size || terms.length) { progress('Scarico colori e tipi delle carte\u2026'); en = await enData(code); }
+
+    if (wantedColors.size || terms.length) {
+      for (const [key, list] of [...groups.entries()]) {
+        const nm = list[0].name || '';
+        if (wantedColors.size) {
+          const known = list.map(bpColor).find(Boolean) || italianFor(nm, en.colors);
+          if (!known) colorUnavailable = true;
+          else if (!colorMatches(known, wantedColors)) { groups.delete(key); continue; }
+          else list.forEach(b => { b._color = known; });
+        }
+        if (terms.length) {
+          const tEn = italianFor(nm, en.types), tIt = italianFor(nm, it.types);
+          const nIt = italianFor(nm, itMap) || '';
+          if (!tEn && !tIt) textUnavailable = true;
+          const hay = norm([nm, nIt, tEn || '', tIt || ''].join(' '));
+          if (!textMatches(terms, textMode, hay)) groups.delete(key);
+        }
+      }
+    }
 
     progress('Scelgo le offerte migliori\u2026');
     const items = [], missing = [], skippedOwned = [];
@@ -325,7 +368,7 @@ const Core = (() => {
       items, missing, skipped_owned: skippedOwned,
       total_cents: items.reduce((a, i) => a + i.price_cents * i.qty, 0),
       currency: items.length ? items[0].currency : 'EUR',
-      italian_names: Object.keys(itMap).length > 0, color_unavailable: colorUnavailable,
+      italian_names: Object.keys(itMap).length > 0, color_unavailable: colorUnavailable, text_unavailable: textUnavailable,
     };
   }
 

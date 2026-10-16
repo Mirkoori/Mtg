@@ -100,6 +100,7 @@ function collect() {
     rarities: [...document.querySelectorAll('#rarities input:checked')].map(i => i.value),
     copies: parseInt($('copies').value) || 1, owned_mode: $('ownedMode').value, owned: state.owned,
     language_mode: $('langMode').value, min_condition: $('cond').value, foil: $('foil').value,
+    text_filter: $('textFilter').value, text_mode: $('textMode').value,
     colors: [...document.querySelectorAll('#colors input:checked')].map(i => i.value),
     max_price: parseFloat($('maxPrice').value) || 0, dedupe: $('dedupe').checked,
   };
@@ -114,7 +115,7 @@ $('btnPreview').onclick = async () => {
     state.plan = await Core.buildPlan(token(), req, t => say('msgPreview', t));
     state.planOpts = req;
     renderPlan();
-    if (state.plan.color_unavailable) say('msgPreview', 'Colori non disponibili per alcune carte: quelle non sono state filtrate per colore.', 'warn');
+    if (state.plan.color_unavailable || state.plan.text_unavailable) say('msgPreview', 'Per alcune carte non ho trovato colore o tipo: il filtro potrebbe aver escluso o lasciato qualche carta di troppo.', 'warn');
     else if (!state.plan.italian_names) say('msgPreview', 'Nomi italiani non disponibili: mostro quelli inglesi.', 'warn');
     else say('msgPreview', '');
   } catch (e) { say('msgPreview', e.message, 'err'); }

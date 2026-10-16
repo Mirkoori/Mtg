@@ -155,6 +155,20 @@
       <label class="chip"><input type="checkbox" value="C">Incolore</label>
       <label class="chip"><input type="checkbox" value="M">Multicolore</label>
     </div>
+    <div class="row">
+      <div>
+        <label for="textFilter">Tipo o nome (separa con la virgola, es. angelo, soldato, chierico)</label>
+        <input id="textFilter" type="text" placeholder="vuoto = tutte le carte" autocomplete="off">
+      </div>
+      <div>
+        <label for="textMode">Cerca</label>
+        <select id="textMode">
+          <option value="any">Almeno una delle parole</option>
+          <option value="all">Tutte le parole</option>
+        </select>
+      </div>
+    </div>
+    <div class="hint">Cerca nel nome e nel tipo della carta (creatura, angelo, chierico...), in italiano e in inglese.</div>
     <div class="hint">Con CardTrader Zero le spedizioni le fa Cardtrader in un unico pacco, quindi per ogni carta viene scelta semplicemente l'offerta pi&#249; economica.</div>
     <div class="check"><input id="dedupe" type="checkbox" checked><label for="dedupe">Una sola versione per carta (ignora showcase, borderless ed extended art doppie)</label></div>
   </section>
