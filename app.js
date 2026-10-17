@@ -186,6 +186,25 @@ function updateSummary() {
   $('btnAdd').textContent = `Aggiungi ${cards} carte al carrello`;
 }
 
+// ---- esportazione CSV (per chiedere le carte a un amico prima di comprarle)
+function csvCell(v) { v = String(v == null ? '' : v); return /[";\r\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; }
+function exportCsv() {
+  const sel = selected(); if (!sel.length) return say('msgAdd', 'Nessuna carta selezionata da esportare.', 'err');
+  const e = state.expansion || {};
+  const head = ['Name', 'Nome italiano', 'Set code', 'Set name', 'Collector number', 'Rarity', 'Colore', 'Quantity', 'Language', 'Condition', 'Foil', 'Prezzo CardTrader'];
+  const lines = [head.join(';')].concat(sel.map(it => [
+    it.name_en, it.name_it, (e.code || '').toLowerCase(), e.name || '', it.collector_number || '', it.rarity || '', colorLabel(it.color),
+    it.qty, it.language || '', it.condition || '', it.foil ? 'foil' : 'normal', (it.price_cents / 100).toFixed(2).replace('.', ',') + ' ' + (it.currency || 'EUR'),
+  ].map(csvCell).join(';')));
+  const blob = new Blob(['\ufeff' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob), a = document.createElement('a');
+  const slug = String(e.name || 'carte').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  a.href = url; a.download = 'carte-da-prendere-' + slug + '.csv'; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+  say('msgAdd', 'File con ' + sel.length + ' carte esportato.', 'ok');
+}
+$('btnCsv').onclick = exportCsv;
+
 // ---- aggiunta al carrello
 let addTotals = { ok: 0, rows: 0 };
 async function runAdd(sel, isRetry) {
