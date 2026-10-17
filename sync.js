@@ -17,7 +17,8 @@
   Storage.prototype.setItem = function (k, v) { rawSet.call(this, k, v); if (this === LS && KEYS.indexOf(k) >= 0) markDirty(); };
   Storage.prototype.removeItem = function (k) { rawRem.call(this, k); if (this === LS && KEYS.indexOf(k) >= 0) markDirty(); };
 
-  const isEmptyLocal = () => { const d = lget('mtg_decks'); return (!d || d === '[]') && !lget('mtg_owned_rows') && !lget('mtg_entries'); };
+  const emptyV = v => !v || v === '[]' || v === '{}';
+  const isEmptyLocal = () => emptyV(lget('mtg_decks')) && emptyV(lget('mtg_owned_rows')) && emptyV(lget('mtg_entries'));
   const hhmm = () => new Date().toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
 
   async function push() {
@@ -31,30 +32,24 @@
     } catch (e) { status = 'Non riesco a salvare online (' + (e.message || e) + '). Riprovo alla prossima modifica.'; }
     busy = false; paint();
   }
-  async function pull(interactive) {
+  const ts = x => { const t = new Date(x).getTime(); return isNaN(t) ? 0 : t; };
+  async function pull() {
     const r = await sb.from('user_data').select('key,value,updated_at'); if (r.error) throw r.error;
-    const rows = r.data || [], last = lget('mtg_sync_last');
-    const newest = rows.reduce((m, x) => (x.updated_at > m ? x.updated_at : m), '');
+    const rows = r.data || [], last = ts(lget('mtg_sync_last'));
+    const newest = rows.reduce((m, x) => Math.max(m, ts(x.updated_at)), 0);
+    const differs = rows.some(x => KEYS.indexOf(x.key) >= 0 && lget(x.key) !== x.value) || KEYS.some(k => lget(k) != null && !rows.some(x => x.key === k));
     const apply = () => {
-      let changed = false;
-      rows.forEach(x => { if (KEYS.indexOf(x.key) >= 0 && lget(x.key) !== x.value) { lset(x.key, x.value); changed = true; } });
-      KEYS.forEach(k => { if (!rows.some(x => x.key === k) && lget(k) != null) { lrem(k); changed = true; } });
-      lset('mtg_sync_last', new Date().toISOString()); lset('mtg_sync_dirty', '0'); status = 'Dati online caricati alle ' + hhmm();
-      if (changed) location.reload();
+      rows.forEach(x => { if (KEYS.indexOf(x.key) >= 0 && lget(x.key) !== x.value) lset(x.key, x.value); });
+      KEYS.forEach(k => { if (!rows.some(x => x.key === k) && lget(k) != null) lrem(k); });
+      lset('mtg_sync_last', new Date(newest).toISOString()); lset('mtg_sync_dirty', '0'); status = 'Dati online caricati alle ' + hhmm();
+      if (differs) location.reload();
     };
     if (!rows.length) { if (!isEmptyLocal()) await push(); return; }
-    if (!last) {
-      if (isEmptyLocal()) return apply();
-      if (confirm('Online ci sono gia dei dati salvati e anche su questo dispositivo ce ne sono altri.\n\nOK = usa i dati online (quelli di questo dispositivo vengono sostituiti)\nAnnulla = tieni quelli di questo dispositivo (sostituiscono quelli online)')) return apply();
-      return push();
-    }
-    if (newest > last) {
-      if (!dirty()) return apply();
-      if (confirm('Hai modifiche su questo dispositivo e anche online.\n\nOK = usa i dati online\nAnnulla = tieni quelli di questo dispositivo')) return apply();
-      return push();
-    }
-    if (dirty()) return push();
-    status = 'Dati sincronizzati';
+    if (!differs) { lset('mtg_sync_last', new Date(newest).toISOString()); lset('mtg_sync_dirty', '0'); status = 'Dati sincronizzati alle ' + hhmm(); return; }
+    // Differenze: se qui non c'e niente di modificato, vincono i dati online.
+    if (isEmptyLocal() || (!dirty() && lget('mtg_sync_last'))) return apply();
+    if (confirm('Online ci sono dei dati salvati diversi da quelli di questo dispositivo.\n\nOK = usa i dati online (quelli di questo dispositivo vengono sostituiti)\nAnnulla = tieni quelli di questo dispositivo (sostituiscono quelli online)')) return apply();
+    return push();
   }
 
   // ---------- interfaccia
