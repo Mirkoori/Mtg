@@ -101,6 +101,7 @@
   .orb b { font-size:32px; line-height:1; } .orb small { font-size:10px; letter-spacing:.1em; text-transform:uppercase; opacity:.85; }
   .orb.low { animation:pulse 1s ease-in-out infinite; }
   @keyframes pulse { 50% { box-shadow:inset 0 -6px 12px rgba(0,0,0,.35),0 0 0 3px #ff6b5a,0 0 22px #ff3b2a; } }
+  .localonly[hidden] { display:none !important; }
   .lifebtns { display:flex; gap:4px; }
   .lifebtns button, .mini button { padding:0; width:30px; height:28px; border-radius:8px; background:rgba(255,255,255,.14); border:1px solid rgba(255,255,255,.3); color:#fff; font-size:13px; }
   .mini { display:flex; gap:10px; flex-wrap:wrap; font-size:12.5px; opacity:.95; align-items:center; }
@@ -181,13 +182,15 @@
         <div class="side">
           <div class="nameplate"><b id="oppName">Avversario</b><span id="oLast" class="last"></span></div>
           <div class="piles">
-            <div class="pile"><span class="pl">Grimorio</span><span class="pimg back"></span><b id="oLib">0</b></div>
+            <button class="pile" data-ozone="lib"><span class="pl">Grimorio</span><span class="pimg back"></span><b id="oLib">0</b></button>
             <button class="pile" data-ozone="gy"><span class="pl">Cimitero</span><span class="pimg" id="oGyImg"></span><b id="oGy">0</b></button>
             <button class="pile" data-ozone="ex"><span class="pl">Esilio</span><span class="pimg" id="oExImg"></span><b id="oEx">0</b></button>
+            <button class="pile localonly" data-ozone="hand" hidden><span class="pl">Mano</span><span class="pimg back"></span><b id="oHand2">0</b></button>
             <button class="pile" data-ozone="cmd" id="oCmdB"><span class="pl">Comando</span><span class="pimg" id="oCmdImg"></span><b id="oCmd">0</b></button>
           </div>
-          <div class="orb"><b id="oLife">20</b><small>vita</small></div>
-          <div class="mini"><span>Veleno <b id="oPois">0</b></span><span>Mano <b id="oHand">0</b></span><span>Turno <b id="oTurn">1</b></span><span id="oPhase"></span></div>
+          <div class="orb" id="oLifeOrb"><b id="oLife">20</b><small>vita</small></div>
+          <div class="lifebtns localonly" hidden><button data-olife="-5">-5</button><button data-olife="-1">-1</button><button data-olife="1">+1</button><button data-olife="5">+5</button></div>
+          <div class="mini"><span>Veleno <button class="localonly" data-opois="-1" hidden>-</button><b id="oPois">0</b><button class="localonly" data-opois="1" hidden>+</button></span><button class="small localonly" id="btnODraw" hidden>Pesca</button><span>Mano <b id="oHand">0</b></span><span>Turno <b id="oTurn">1</b></span><span id="oPhase"></span></div>
         </div>
         <div class="board">
           <div class="lane-row" data-l="Terre" id="oLaneLand"></div>
@@ -244,6 +247,6 @@
 <script src="sync.js?v=3"></script>
 <script src="deckcore.js?v=8"></script>
 <script src="scry.js?v=8"></script>
-<script src="prova.js?v=10"></script>
+<script src="prova.js?v=11"></script>
 </body>
 </html>

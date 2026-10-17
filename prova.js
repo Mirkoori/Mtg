@@ -11,9 +11,17 @@ const nm = c => (c.token ? c.name : ((CARDS[c.id] && (CARDS[c.id].name_it || CAR
 const data = c => CARDS[c.id] || {};
 let toastT = null;
 function toast(t) { const e = $('toast'); e.textContent = t; e.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => { e.hidden = true; }, 2200); }
-function say(t) { G.log.unshift('T' + G.turn + ': ' + t); G.log = G.log.slice(0, 80); }
-function snap() { G.hist.push(JSON.stringify({ lib: G.lib, hand: G.hand, bf: G.bf, gy: G.gy, ex: G.ex, cmd: G.cmd, life: G.life, pois: G.pois, turn: G.turn, uid: G.uid, mulls: G.mulls })); if (G.hist.length > 60) G.hist.shift(); }
-function undo() { const s = G.hist.pop(); if (!s) { toast('Niente da annullare'); return; } Object.assign(G, JSON.parse(s)); render(); }
+function say(t, P) { P = P || G; P.log.unshift('T' + P.turn + ': ' + t); P.log = P.log.slice(0, 80); }
+let HIST = [];
+const FIELDS = ['lib', 'hand', 'bf', 'gy', 'ex', 'cmd', 'life', 'pois', 'turn', 'phase', 'uid', 'mulls'];
+function snap() {
+  HIST.push(JSON.stringify(PL.map(p => { const o = {}; FIELDS.forEach(k => { o[k] = p[k]; }); return o; })));
+  if (HIST.length > 80) HIST.shift();
+}
+function undo() {
+  const s = HIST.pop(); if (!s) { toast('Niente da annullare'); return; }
+  JSON.parse(s).forEach((o, i) => { if (PL[i]) Object.assign(PL[i], o); }); render();
+}
 function shuffle(a) { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); const t = a[i]; a[i] = a[j]; a[j] = t; } return a; }
 const mk = id => ({ uid: ++G.uid, id: id, tapped: false, cnt: 0 });
 
@@ -45,7 +53,7 @@ function start() {
   if (!d.cards.some(e => e.section !== 'side')) { $('setupMsg').textContent = 'Il mazzo e vuoto.'; return; }
   mode = $('modeSel').value; cur = 0;
   PL = [build(d)]; if (mode === 'local') { if (!d2) return; PL.push(build(d2)); }
-  G = PL[0]; started = true;
+  G = PL[0]; started = true; HIST = [];
   $('setupMsg').textContent = ''; $('game').hidden = false; $('hand').hidden = false;
   render(); sync();
   setTimeout(() => { try { $('mat').scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (e) { /* ignora */ } }, 60);
@@ -61,20 +69,21 @@ function mulligan() {
 }
 function nextTurn() { snap(); G.turn++; G.phase = 3; G.bf.forEach(c => { c.tapped = false; }); draw(1, true); say('nuovo turno, stacca e pesca'); render(); }
 
-function find(zone, uid) { const a = G[zone]; const i = a.findIndex(c => c.uid === uid); return { a: a, i: i, c: a[i] }; }
-function moveTo(zone, uid, dest, where) {
-  const f = find(zone, uid); if (!f.c) return; snap();
+const pOf = p => (PL[p == null ? cur : p] || G);
+function find(zone, uid, p) { const a = pOf(p)[zone]; const i = a.findIndex(c => c.uid === uid); return { a: a, i: i, c: a[i] }; }
+function moveTo(zone, uid, dest, where, p) {
+  const P = pOf(p); const f = find(zone, uid, p); if (!f.c) return; snap();
   f.a.splice(f.i, 1);
-  if (f.c.token && dest !== 'bf') { say('gettone ' + f.c.name + ' rimosso'); render(); return; }
+  if (f.c.token && dest !== 'bf') { say('gettone ' + f.c.name + ' rimosso', P); render(); return; }
   f.c.tapped = false; if (dest !== 'bf') f.c.cnt = 0;
-  if (where === 'top') G[dest].unshift(f.c); else G[dest].push(f.c);
-  say(nm(f.c) + ' -> ' + ({ bf: 'campo', hand: 'mano', gy: 'cimitero', ex: 'esilio', lib: 'grimorio', cmd: 'comando' })[dest]);
+  if (where === 'top') P[dest].unshift(f.c); else P[dest].push(f.c);
+  say(nm(f.c) + ' -> ' + ({ bf: 'campo', hand: 'mano', gy: 'cimitero', ex: 'esilio', lib: 'grimorio', cmd: 'comando' })[dest], P);
   render();
 }
-function cardHtml(c, zone) {
+function cardHtml(c, zone, p) {
   const d = data(c); const cls = 'card' + (c.tapped ? ' tapped' : '') + (c.token ? ' token' : '');
   const img = c.token ? '<div class="noimg">' + esc(c.name) + (c.pt ? '<br>' + esc(c.pt) : '') + '</div>' : (d.img ? '<img loading="lazy" src="' + esc(d.img) + '" alt="' + esc(nm(c)) + '">' : '<div class="noimg">' + esc(nm(c)) + '</div>');
-  return '<div class="' + cls + '" data-z="' + zone + '" data-u="' + c.uid + '">' + img + (c.cnt ? '<span class="cb">' + (c.cnt > 0 ? '+' : '') + c.cnt + '</span>' : '') + '</div>';
+  return '<div class="' + cls + '" data-z="' + zone + '" data-u="' + c.uid + '"' + (p != null ? ' data-p="' + p + '"' : '') + '>' + img + (c.cnt ? '<span class="cb">' + (c.cnt > 0 ? '+' : '') + c.cnt + '</span>' : '') + '</div>';
 }
 const PHASES = ['Stappa', 'Mantenimento', 'Pesca', 'Principale 1', 'Combattimento', 'Principale 2', 'Fine'];
 let lastHand = null;
@@ -97,6 +106,7 @@ function renderPhases() {
   $('phases').innerHTML = PHASES.map((p, i) => '<button class="ph' + (i === G.phase ? ' on' : '') + '" data-phase="' + i + '">' + p + '</button>').join('');
 }
 function render() {
+  if (PL.length) G = PL[cur];
   const lane = { laneOther: [], laneCreature: [], laneLand: [] };
   G.bf.forEach(c => {
     const d = data(c); const t = c.token ? (c.isCre ? 'c' : 'o') : (Deck.isLand(d) ? 'l' : (/Creature/.test(d.type || '') ? 'c' : 'o'));
@@ -128,7 +138,21 @@ function ocard(c, z) {
   return '<div class="card' + (c.t ? ' tapped' : '') + '" data-oz="' + z + '" data-ou="' + c.u + '">' + img + (c.n ? '<span class="cb">' + (c.n > 0 ? '+' : '') + c.n + '</span>' : '') + '</div>';
 }
 function oppData() { return mode === 'online' ? remote : mode === 'local' && PL[1 - cur] ? pub(PL[1 - cur]) : null; }
+function renderOppLocal() {
+  const pi = 1 - cur, P = PL[pi]; const lane = { l: [], c: [], o: [] };
+  P.bf.forEach(c => { lane[laneOf(c)].push(c); });
+  const m = { o: 'oLaneOther', c: 'oLaneCreature', l: 'oLaneLand' };
+  Object.keys(m).forEach(k => { $(m[k]).innerHTML = lane[k].map(c => cardHtml(c, 'bf', pi)).join(''); });
+  $('oppName').textContent = P.name; $('oLast').textContent = P.log[0] || '';
+  $('oLife').textContent = P.life; $('oPois').textContent = P.pois; $('oTurn').textContent = P.turn; $('oHand').textContent = P.hand.length; $('oHand2').textContent = P.hand.length;
+  $('oLib').textContent = P.lib.length; $('oGy').textContent = P.gy.length; $('oEx').textContent = P.ex.length; $('oCmd').textContent = P.cmd.length;
+  $('oCmdB').hidden = !P.cmd.length; $('oPhase').textContent = 'Fase: ' + PHASES[P.phase];
+  pileImg($('oGyImg'), P.gy, c => data(c).img || ''); pileImg($('oExImg'), P.ex, c => data(c).img || ''); pileImg($('oCmdImg'), P.cmd, c => data(c).img || '');
+}
 function renderOpp() {
+  document.querySelectorAll('.localonly').forEach(e => { e.hidden = mode !== 'local'; });
+  $('oLifeOrb').classList.toggle('low', mode === 'local' && PL[1 - cur] && PL[1 - cur].life <= 5);
+  if (mode === 'local' && PL[1 - cur]) { $('oppBox').hidden = false; return renderOppLocal(); }
   const o = oppData(); const box = $('oppBox');
   if (mode === 'solo' || (!o && mode !== 'online')) { box.hidden = true; return; }
   box.hidden = false;
@@ -190,32 +214,34 @@ function joinRoom() {
 
 function openSheet(html) { $('sBody').innerHTML = html; $('sheet').hidden = false; document.body.classList.add('noscroll'); }
 function closeSheet() { $('sheet').hidden = true; document.body.classList.remove('noscroll'); }
-function cardMenu(zone, uid) {
-  const f = find(zone, uid); const c = f.c; if (!c) return;
+function cardMenu(zone, uid, p) {
+  const f = find(zone, uid, p); const c = f.c; if (!c) return;
+  const owner = pOf(p);
   const d = data(c); const big = d.imgBig || d.img;
   const b = (a, t, cls) => '<button class="' + (cls || '') + '" data-a="' + a + '">' + t + '</button>';
   let acts = '';
   if (zone === 'hand') acts = b('play', 'Gioca sul campo') + b('gy', 'Cimitero', 'secondary') + b('ex', 'Esilio', 'secondary') + b('top', 'In cima al grimorio', 'secondary') + b('bot', 'In fondo al grimorio', 'secondary');
   else if (zone === 'bf') acts = b('tap', c.tapped ? 'Stacca' : 'Tappa') + b('p1', '+1 segnalino', 'secondary') + b('m1', '-1 segnalino', 'secondary') + b('gy', 'Cimitero', 'secondary') + b('ex', 'Esilio', 'secondary') + b('hand', 'In mano', 'secondary') + b('top', 'In cima al grimorio', 'secondary') + b('bot', 'In fondo al grimorio', 'secondary') + (c.token ? '' : b('copy', 'Crea copia (gettone)', 'secondary'));
   else acts = b('play', 'Gioca sul campo') + b('hand', 'In mano', 'secondary') + b('gy', 'Cimitero', 'secondary') + b('ex', 'Esilio', 'secondary') + b('top', 'In cima al grimorio', 'secondary') + b('bot', 'In fondo al grimorio', 'secondary');
-  openSheet('<div class="big">' + (c.token ? '<div class="noimg" style="width:220px">' + esc(c.name) + '</div>' : (big ? '<img src="' + esc(big) + '" alt="">' : '')) + '<div style="flex:1;min-width:200px"><h3 style="margin:0">' + esc(nm(c)) + '</h3><div class="msg">' + esc(d.type_it || d.type || '') + ' ' + (d.mana ? manaHtml(d.mana) : '') + '</div><div class="otext">' + esc(d.text_it || d.text || '').replace(/\n/g, '<br>') + '</div><div class="acts">' + acts + '</div></div></div>');
-  $('sBody').dataset.z = zone; $('sBody').dataset.u = uid;
+  openSheet('<div class="big">' + (c.token ? '<div class="noimg" style="width:220px">' + esc(c.name) + '</div>' : (big ? '<img src="' + esc(big) + '" alt="">' : '')) + '<div style="flex:1;min-width:200px"><h3 style="margin:0">' + esc(nm(c)) + '</h3>' + (mode === 'local' ? '<div class="msg">Carta di ' + esc(owner.name) + '</div>' : '') + '<div class="msg">' + esc(d.type_it || d.type || '') + ' ' + (d.mana ? manaHtml(d.mana) : '') + '</div><div class="otext">' + esc(d.text_it || d.text || '').replace(/\n/g, '<br>') + '</div><div class="acts">' + acts + '</div></div></div>');
+  $('sBody').dataset.z = zone; $('sBody').dataset.u = uid; $('sBody').dataset.p = p == null ? cur : p;
 }
 function cardAct(a) {
-  const zone = $('sBody').dataset.z, uid = +$('sBody').dataset.u; const f = find(zone, uid); if (!f.c) return;
+  const zone = $('sBody').dataset.z, uid = +$('sBody').dataset.u, p = +($('sBody').dataset.p || cur); const P = pOf(p); const f = find(zone, uid, p); if (!f.c) return;
   if (a === 'tap') { snap(); f.c.tapped = !f.c.tapped; render(); closeSheet(); return; }
-  if (a === 'p1' || a === 'm1') { snap(); f.c.cnt += a === 'p1' ? 1 : -1; render(); cardMenu(zone, uid); return; }
-  if (a === 'copy') { snap(); const t = { uid: ++G.uid, id: f.c.id, token: true, name: 'Copia di ' + nm(f.c), tapped: false, cnt: 0, isCre: /Creature/.test(data(f.c).type || '') }; G.bf.push(t); say('copia di ' + nm(f.c)); render(); closeSheet(); return; }
+  if (a === 'p1' || a === 'm1') { snap(); f.c.cnt += a === 'p1' ? 1 : -1; render(); cardMenu(zone, uid, p); return; }
+  if (a === 'copy') { snap(); const t = { uid: ++P.uid, id: f.c.id, token: true, name: 'Copia di ' + nm(f.c), tapped: false, cnt: 0, isCre: /Creature/.test(data(f.c).type || '') }; P.bf.push(t); say('copia di ' + nm(f.c), P); render(); closeSheet(); return; }
   const map = { play: ['bf'], gy: ['gy'], ex: ['ex'], hand: ['hand'], top: ['lib', 'top'], bot: ['lib', 'bot'] };
-  const m = map[a]; moveTo(zone, uid, m[0], m[1] === 'top' ? 'top' : undefined); closeSheet();
+  const m = map[a]; moveTo(zone, uid, m[0], m[1] === 'top' ? 'top' : undefined, p); closeSheet();
 }
-function zoneView(z) {
-  const names = { library: 'Grimorio', graveyard: 'Cimitero', exile: 'Esilio', command: 'Zona di comando' };
-  const key = { library: 'lib', graveyard: 'gy', exile: 'ex', command: 'cmd' }[z];
-  let arr = G[key].slice();
-  if (z === 'library') { arr = arr.map(c => c); arr.sort((a, b) => nm(a).localeCompare(nm(b), 'it')); }
+function zoneView(z, p) {
+  const P = pOf(p); const pi = p == null ? cur : p;
+  const names = { library: 'Grimorio', graveyard: 'Cimitero', exile: 'Esilio', command: 'Zona di comando', hand: 'Mano' };
+  const key = { library: 'lib', graveyard: 'gy', exile: 'ex', command: 'cmd', hand: 'hand' }[z];
+  let arr = P[key].slice();
+  if (z === 'library') { arr.sort((a, b) => nm(a).localeCompare(nm(b), 'it')); }
   const note = z === 'library' ? '<div class="msg">Elenco in ordine alfabetico (non e l\'ordine reale). Tocca una carta per metterla in mano o sul campo.</div>' : '';
-  openSheet('<h3 style="margin:0">' + names[z] + ' (' + arr.length + ')</h3>' + note + '<div class="sgrid">' + (arr.map(c => cardHtml(c, key)).join('') || '<span class="msg">vuoto</span>') + '</div>');
+  openSheet('<h3 style="margin:0">' + names[z] + (mode === 'local' ? ' di ' + esc(P.name) : '') + ' (' + arr.length + ')</h3>' + note + '<div class="sgrid">' + (arr.map(c => cardHtml(c, key, pi)).join('') || '<span class="msg">vuoto</span>') + '</div>');
   $('sBody').dataset.view = z;
 }
 function scryTop() {
@@ -243,23 +269,27 @@ document.addEventListener('click', e => {
   if (t.id === 'sheet') { closeSheet(); return; }
   const act = t.closest('#sBody .acts button'); if (act) { cardAct(act.dataset.a); return; }
   const card = t.closest('.card[data-u]');
-  if (card) {
-    const z = card.dataset.z, uid = +card.dataset.u;
-    if (z === 'lib' || z === 'gy' || z === 'ex' || z === 'cmd') { $('sBody').dataset.z = z; $('sBody').dataset.u = uid; cardMenu(z, uid); return; }
-    if (z === 'bf' && !$('sheet').hidden) { cardMenu(z, uid); return; }
-    cardMenu(z, uid); return;
-  }
+  if (card) { cardMenu(card.dataset.z, +card.dataset.u, card.dataset.p != null ? +card.dataset.p : undefined); return; }
   const ph = t.closest('[data-phase]'); if (ph) { G.phase = +ph.dataset.phase; say('fase: ' + PHASES[G.phase]); render(); return; }
   const oc = t.closest('[data-ou]');
   if (oc) { const o = oppData(); const z = oc.dataset.oz; const c = o && (o[z] || []).find(x => x.u === +oc.dataset.ou); if (c) oppSheet(c); return; }
-  const oz = t.closest('[data-ozone]'); if (oz) { oppZone(oz.dataset.ozone); return; }
+  const oz = t.closest('[data-ozone]');
+  if (oz) {
+    const zk = oz.dataset.ozone;
+    if (mode === 'local') { zoneView({ gy: 'graveyard', ex: 'exile', cmd: 'command', lib: 'library', hand: 'hand' }[zk], 1 - cur); return; }
+    if (zk !== 'lib') oppZone(zk);
+    return;
+  }
+  const ol = t.closest('[data-olife]'); if (ol && mode === 'local') { snap(); PL[1 - cur].life += +ol.dataset.olife; say('vita ' + PL[1 - cur].life, PL[1 - cur]); render(); return; }
+  const op = t.closest('[data-opois]'); if (op && mode === 'local') { snap(); const P = PL[1 - cur]; P.pois = Math.max(0, P.pois + +op.dataset.opois); render(); return; }
+  if (t.closest('#btnODraw') && mode === 'local') { snap(); const P = PL[1 - cur]; const c = P.lib.shift(); if (c) { P.hand.push(c); say('pesca 1', P); } else toast('Grimorio finito'); render(); return; }
   const zb = t.closest('[data-zone]'); if (zb) { zoneView(zb.dataset.zone); return; }
   const li = t.closest('[data-life]'); if (li) { snap(); G.life += +li.dataset.life; say('vita ' + G.life); render(); return; }
   const po = t.closest('[data-pois]'); if (po) { snap(); G.pois = Math.max(0, G.pois + +po.dataset.pois); render(); return; }
 });
 document.addEventListener('dblclick', e => {
   const card = e.target.closest('.card[data-z="bf"]'); if (!card) return;
-  const f = find('bf', +card.dataset.u); if (f.c) { snap(); f.c.tapped = !f.c.tapped; render(); closeSheet(); }
+  const f = find('bf', +card.dataset.u, card.dataset.p != null ? +card.dataset.p : undefined); if (f.c) { snap(); f.c.tapped = !f.c.tapped; render(); closeSheet(); }
 });
 $('btnStart').onclick = start;
 $('btnDraw').onclick = () => { snap(); draw(1); render(); };
@@ -274,7 +304,7 @@ window.addEventListener('resize', () => { if (started) fanHand(); });
 document.addEventListener('mouseover', e => {
   const pk = $('peek'); const el = e.target.closest ? e.target.closest('.card[data-u],.card[data-ou]') : null;
   let src = '';
-  if (el && el.dataset.u) { const f = find(el.dataset.z, +el.dataset.u); if (f.c && !f.c.token) { const d = data(f.c); src = d.imgBig || d.img || ''; } }
+  if (el && el.dataset.u) { const f = find(el.dataset.z, +el.dataset.u, el.dataset.p != null ? +el.dataset.p : undefined); if (f.c && !f.c.token) { const d = data(f.c); src = d.imgBig || d.img || ''; } }
   else if (el && el.dataset.ou) { const o = oppData(); const c = o && (o[el.dataset.oz] || []).find(x => x.u === +el.dataset.ou); if (c) src = c.ib || c.i || ''; }
   if (src) { pk.firstChild.src = src; pk.hidden = false; } else pk.hidden = true;
 });
