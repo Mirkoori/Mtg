@@ -57,6 +57,16 @@ function parseCSV(text, delim) {
   if (f !== '' || row.length) { row.push(f); rows.push(row); }
   return rows;
 }
+function csvTable(text) {
+  text = text.replace(/^\ufeff/, '');
+  let delim = ',';
+  const first = text.split('\n', 1)[0];
+  if (!first.includes(',')) { if (first.includes(';')) delim = ';'; else if (first.includes('\t')) delim = '\t'; }
+  const m = /^"?sep=(.)"?$/i.exec(first.trim());
+  if (m) { delim = m[1]; text = text.slice(text.indexOf('\n') + 1); }
+  const rows = parseCSV(text, delim).filter(r => r.length > 1);
+  return { head: rows.shift() || [], rows };
+}
 $('csv').onchange = async ev => {
   const file = ev.target.files[0]; if (!file) return;
   let text = (await file.text()).replace(/^\ufeff/, '');
@@ -114,8 +124,85 @@ $('btnExp').onclick = async () => {
     $('rarities').innerHTML = names.map(n =>
       `<label class="chip"><input type="checkbox" value="${esc(n)}" ${n === 'Common' ? 'checked' : ''}>${esc(n)}${d.rarities[n] ? ' (' + d.rarities[n] + ')' : ''}</label>`).join('');
     say('msgExp', `${e.name}: ${d.cards} carte diverse.`, 'ok');
-    $('btnPreview').disabled = false;
+    refreshPreviewBtn();
   } catch (err) { say('msgExp', err.message, 'err'); }
+};
+
+// ---- modalita': espansione intera oppure lista di carte
+function mode() { return document.querySelector('input[name=mode]:checked').value; }
+function listItems() { return Deck.parseList($('listText').value).map(i => ({ qty: i.qty, name: i.name })); }
+function refreshPreviewBtn() {
+  $('btnPreview').disabled = mode() === 'list' ? !listItems().length : !state.expansion;
+}
+function setMode() {
+  const l = mode() === 'list';
+  $('secList').hidden = !l; $('secExp').hidden = l;
+  document.querySelectorAll('.only-exp').forEach(e => { e.hidden = l; });
+  $('previewBox').hidden = true; state.plan = null;
+  refreshPreviewBtn();
+}
+document.querySelectorAll('input[name=mode]').forEach(r => r.onchange = setMode);
+function updateListInfo(extra) {
+  const it = listItems();
+  const cards = it.reduce((a, i) => a + i.qty, 0);
+  say('msgList', it.length ? `${it.length} righe riconosciute, ${cards} carte in totale.${extra ? ' ' + extra : ''}` : 'Nessuna carta nella lista.', it.length ? 'ok' : '');
+  refreshPreviewBtn();
+}
+$('listText').oninput = () => updateListInfo();
+function pdfJsUrl(f) { return 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/' + f; }
+async function loadPdfJs() {
+  if (window.pdfjsLib) return window.pdfjsLib;
+  await new Promise((res, rej) => {
+    const s = document.createElement('script'); s.src = pdfJsUrl('pdf.min.js'); s.onload = res;
+    s.onerror = () => rej(new Error('Non riesco a caricare il lettore PDF. Apri il PDF, copia il testo e incollalo qui sotto.'));
+    document.head.appendChild(s);
+  });
+  const lib = window.pdfjsLib;
+  try { // il worker va caricato da un indirizzo locale: lo scarico e lo servo come blob
+    const t = await (await fetch(pdfJsUrl('pdf.worker.min.js'))).text();
+    lib.GlobalWorkerOptions.workerSrc = URL.createObjectURL(new Blob([t], { type: 'text/javascript' }));
+  } catch (e) { lib.GlobalWorkerOptions.workerSrc = pdfJsUrl('pdf.worker.min.js'); }
+  return lib;
+}
+async function pdfText(file) {
+  const lib = await loadPdfJs();
+  const doc = await lib.getDocument({ data: new Uint8Array(await file.arrayBuffer()) }).promise;
+  const lines = [];
+  for (let p = 1; p <= doc.numPages; p++) {
+    const tc = await (await doc.getPage(p)).getTextContent();
+    const rows = [];
+    for (const it of tc.items) {
+      if (!it.str || !it.str.trim()) continue;
+      const y = Math.round(it.transform[5]);
+      let r = rows.find(r => Math.abs(r.y - y) <= 2); if (!r) rows.push(r = { y, parts: [] });
+      r.parts.push({ x: it.transform[4], s: it.str });
+    }
+    rows.sort((a, b) => b.y - a.y).forEach(r => lines.push(r.parts.sort((a, b) => a.x - b.x).map(q => q.s).join(' ').replace(/\s+/g, ' ').trim()));
+  }
+  return lines.filter(l => l && l.length <= 70 && /[A-Za-z\u00c0-\u017f]{2}/.test(l)).join('\n');
+}
+function csvToLines(text) {
+  const { head, rows } = csvTable(text);
+  const ixAny = names => { for (const n of names) { const i = head.findIndex(h => h.trim().toLowerCase() === n); if (i >= 0) return i; } return -1; };
+  const iName = ixAny(['card name', 'name', 'nome', 'nome carta', 'carta']);
+  if (iName < 0) return null;
+  const iQty = ixAny(['quantity', 'qty', 'count', 'quantita', 'quantit\u00e0', 'q.t\u00e0', 'qta', 'amount']);
+  return rows.filter(r => r[iName] && r[iName].trim()).map(r => (iQty >= 0 ? (parseInt(r[iQty]) || 1) : 1) + ' ' + r[iName].trim()).join('\n');
+}
+$('listFile').onchange = async ev => {
+  const file = ev.target.files[0]; if (!file) return;
+  say('msgList', 'Leggo il file\u2026');
+  try {
+    let text;
+    if (/\.pdf$/i.test(file.name) || file.type === 'application/pdf') text = await pdfText(file);
+    else {
+      const raw = await file.text();
+      text = /\.csv$/i.test(file.name) || file.type === 'text/csv' ? csvToLines(raw) : null;
+      if (text === null) text = raw.replace(/^\ufeff/, '');
+    }
+    $('listText').value = text;
+    updateListInfo(/\.pdf$/i.test(file.name) ? 'Controlla che le righe siano giuste: dal PDF possono entrare anche altre scritte.' : '');
+  } catch (e) { say('msgList', e.message, 'err'); }
 };
 
 // ---- 5. anteprima
@@ -132,20 +219,24 @@ function collect() {
   };
 }
 $('btnPreview').onclick = async () => {
-  if (!state.expansion) return;
-  const req = collect();
-  if (!req.rarities.length) return say('msgPreview', 'Seleziona almeno una rarit\u00e0.', 'err');
+  const isList = mode() === 'list';
+  if (!isList && !state.expansion) return;
+  const req = isList ? {
+    items: listItems(), owned_mode: $('ownedMode').value, owned: state.owned,
+    language_mode: $('langMode').value, min_condition: $('cond').value, foil: $('foil').value, max_price: parseFloat($('maxPrice').value) || 0,
+  } : collect();
+  if (!isList && !req.rarities.length) return say('msgPreview', 'Seleziona almeno una rarit\u00e0.', 'err');
   applyProxy();
   $('btnPreview').disabled = true; say('msgPreview', 'Cerco le offerte migliori\u2026');
   try {
-    state.plan = await Core.buildPlan(token(), req, t => say('msgPreview', t));
+    state.plan = isList ? await Core.buildListPlan(token(), req, t => say('msgPreview', t)) : await Core.buildPlan(token(), req, t => say('msgPreview', t));
     state.planOpts = req;
     renderPlan();
     if (state.plan.color_unavailable || state.plan.text_unavailable) say('msgPreview', 'Per alcune carte non ho trovato colore o tipo: il filtro potrebbe aver escluso o lasciato qualche carta di troppo.', 'warn');
     else if (!state.plan.italian_names) say('msgPreview', 'Nomi italiani non disponibili: mostro quelli inglesi.', 'warn');
     else say('msgPreview', '');
   } catch (e) { say('msgPreview', e.message, 'err'); }
-  $('btnPreview').disabled = false;
+  refreshPreviewBtn();
 };
 const COLOR_IT = { W: 'Bianco', U: 'Blu', B: 'Nero', R: 'Rosso', G: 'Verde', C: 'Incolore' };
 function colorLabel(c) {
@@ -162,14 +253,14 @@ function renderPlan() {
   const p = state.plan; $('previewBox').hidden = false;
   $('rows').innerHTML = p.items.map((it, i) => `<tr>
     <td><input type="checkbox" data-i="${i}" checked></td>
-    <td><img class="thumb" data-img="${i}" alt="" hidden></td>
+    <td><img class="thumb" data-img="${i}" alt="" ${it.img ? 'src="' + esc(it.img) + '"' : 'hidden'}></td>
     <td>${esc(it.name_it)}${it.version ? ' <span class="en">(' + esc(it.version) + ')</span>' : ''}${it.name_it !== it.name_en ? '<div class="en">' + esc(it.name_en) + '</div>' : ''}<div class="show-sm">${colorIcons(it.color)}</div></td>
-    <td class="hide-sm">${esc(it.collector_number || '')}</td>
+    <td class="hide-sm">${it.set_code ? '<b>' + esc(it.set_code.toUpperCase()) + '</b> ' : ''}${esc(it.collector_number || '')}</td>
     <td class="hide-sm">${colorIcons(it.color)}</td>
     <td class="hide-sm">${esc(it.condition)} \u00b7 ${esc((it.language || '').toUpperCase())}${it.foil ? ' \u00b7 foil' : ''}</td>
     <td class="num">${it.qty}</td><td class="num">${money(it.price_cents, it.currency)}</td></tr>`).join('');
   $('rows').querySelectorAll('input').forEach(c => c.onchange = updateSummary);
-  loadImages(p.items);
+  if (!p.list) loadImages(p.items);
   const miss = p.missing;
   $('missingBox').hidden = !miss.length;
   $('missingSum').textContent = `${miss.length} carte non trovate con questi filtri`;
@@ -238,7 +329,8 @@ document.addEventListener('click', e => {
   if (im && state.plan) {
     const it = state.plan.items[+im.dataset.img]; const code = ((state.expansion && state.expansion.code) || '').toLowerCase();
     const x = it && imgCache[code + '|' + (it.collector_number || '') + '|' + it.name_en];
-    if (x) { $('zoom').innerHTML = '<img src="' + x.l + '" alt="">'; $('zoom').hidden = false; }
+    if (it && it.img_big) { $('zoom').innerHTML = '<img src="' + esc(it.img_big) + '" alt="">'; $('zoom').hidden = false; }
+    else if (x) { $('zoom').innerHTML = '<img src="' + x.l + '" alt="">'; $('zoom').hidden = false; }
     return;
   }
   if (e.target.closest('#zoom')) $('zoom').hidden = true;
@@ -251,12 +343,12 @@ function exportCsv() {
   const e = state.expansion || {};
   const head = ['Name', 'Nome italiano', 'Set code', 'Set name', 'Collector number', 'Rarity', 'Colore', 'Quantity', 'Language', 'Condition', 'Foil', 'Prezzo CardTrader'];
   const lines = [head.join(';')].concat(sel.map(it => [
-    it.name_en, it.name_it, (e.code || '').toLowerCase(), e.name || '', it.collector_number || '', it.rarity || '', colorLabel(it.color),
+    it.name_en, it.name_it, it.set_code || (e.code || '').toLowerCase(), it.set_name || e.name || '', it.collector_number || '', it.rarity || '', colorLabel(it.color),
     it.qty, it.language || '', it.condition || '', it.foil ? 'foil' : 'normal', (it.price_cents / 100).toFixed(2).replace('.', ',') + ' ' + (it.currency || 'EUR'),
   ].map(csvCell).join(';')));
   const blob = new Blob(['\ufeff' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' });
   const url = URL.createObjectURL(blob), a = document.createElement('a');
-  const slug = String(e.name || 'carte').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  const slug = String(state.plan && state.plan.list ? 'lista' : (e.name || 'carte')).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
   a.href = url; a.download = 'carte-da-prendere-' + slug + '.csv'; document.body.appendChild(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 2000);
   say('msgAdd', 'File con ' + sel.length + ' carte esportato.', 'ok');
@@ -291,7 +383,7 @@ async function runAdd(sel, isRetry) {
   $('result').innerHTML = html;
   const rb = $('btnRetry');
   if (rb) rb.onclick = () => runAdd(fails.map(f => f.it), true);
-  $('btnAdd').disabled = false; $('btnPreview').disabled = false;
+  $('btnAdd').disabled = false; refreshPreviewBtn();
 }
 $('btnAdd').onclick = async () => {
   const sel = selected(); if (!sel.length) return;

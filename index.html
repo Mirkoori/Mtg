@@ -59,6 +59,7 @@
   .summary b { font-size:18px; display:block; } .summary span { color:var(--muted); font-size:12px; }
   details { margin-top:10px; font-size:13px; } summary { cursor:pointer; color:var(--muted); }
   progress { width:100%; height:12px; margin-top:10px; }
+  textarea { width:100%; min-height:130px; padding:9px 10px; border:1px solid var(--line); border-radius:8px; background:var(--bg); color:var(--ink); font:inherit; font-size:16px; }
   .hint { font-size:12.5px; color:var(--muted); margin-top:4px; }
   .badge { font-size:12px; background:var(--bg); border:1px solid var(--line); border-radius:6px; padding:2px 8px; color:var(--muted); }
   a { color:var(--accent); }
@@ -91,6 +92,14 @@
     </div>
   </section>
 
+  <section id="secMode">
+    <h2>Cosa vuoi comprare?</h2>
+    <div class="chips">
+      <label class="chip"><input type="radio" name="mode" value="exp" checked>Un'espansione intera</label>
+      <label class="chip"><input type="radio" name="mode" value="list">Una lista di carte (PDF, CSV, testo)</label>
+    </div>
+  </section>
+
   <section>
     <h2><span class="n">2</span> Le carte che hai gi&#224;</h2>
     <label for="csv">File CSV della collezione (Dragon Shield, ManaBox e simili: colonne nome, codice set e quantit&#224;)</label>
@@ -105,7 +114,7 @@
           <option value="none">Non escludere nulla</option>
         </select>
       </div>
-      <div>
+      <div class="only-exp">
         <label for="copies">Copie totali che vuoi avere</label>
         <input id="copies" type="number" min="1" value="1" inputmode="numeric">
         <div class="hint">Se ne hai gi&#224; alcune, aggiunge solo la differenza.</div>
@@ -113,7 +122,17 @@
     </div>
   </section>
 
-  <section>
+  <section id="secList" hidden>
+    <h2><span class="n">3</span> La lista di carte</h2>
+    <label for="listFile">Carica un file (PDF, CSV o testo) oppure incolla la lista qui sotto</label>
+    <input id="listFile" type="file" accept=".pdf,.csv,.txt,.text,application/pdf,text/csv,text/plain">
+    <label for="listText">Una carta per riga, con la quantit&#224; davanti (es. &#171;4 Fulmine&#187;). Vanno bene nomi italiani o inglesi.</label>
+    <textarea id="listText" rows="8" placeholder="4 Fulmine&#10;2 Controincantesimo&#10;1 Sol Ring"></textarea>
+    <div id="msgList" class="msg">Nessuna carta nella lista.</div>
+    <div class="hint">Per ogni carta viene messa nel carrello l'offerta CardTrader Zero pi&#249; economica tra le edizioni disponibili (ne controllo fino a 3). L'edizione esatta la scegli poi su Cardtrader, prima di pagare.</div>
+  </section>
+
+  <section id="secExp">
     <h2><span class="n">3</span> Espansione e rarit&#224;</h2>
     <label for="exp">Espansione</label>
     <input id="exp" type="text" list="expList" placeholder="Scrivi per cercare, es. Lord of the Rings" disabled>
@@ -156,6 +175,7 @@
         <input id="maxPrice" type="number" min="0" step="0.05" value="0" inputmode="decimal">
       </div>
     </div>
+    <div class="only-exp">
     <label>Colore (nessuno selezionato = tutti)</label>
     <div id="colors" class="chips">
       <label class="chip" title="Bianco" aria-label="Bianco"><input type="checkbox" value="W"><span class="pip pW">W</span></label>
@@ -180,8 +200,9 @@
       </div>
     </div>
     <div class="hint">Cerca nel nome e nel tipo della carta (creatura, angelo, chierico...), in italiano e in inglese.</div>
+    </div>
     <div class="hint">Con CardTrader Zero le spedizioni le fa Cardtrader in un unico pacco, quindi per ogni carta viene scelta semplicemente l'offerta pi&#249; economica.</div>
-    <div class="check"><input id="dedupe" type="checkbox" checked><label for="dedupe">Una sola versione per carta (ignora showcase, borderless ed extended art doppie)</label></div>
+    <div class="check only-exp"><input id="dedupe" type="checkbox" checked><label for="dedupe">Una sola versione per carta (ignora showcase, borderless ed extended art doppie)</label></div>
   </section>
 
   <section>
@@ -193,7 +214,7 @@
     <div id="previewBox" hidden>
       <div class="summary" id="summary"></div>
       <div class="tablewrap"><table>
-        <thead><tr><th></th><th></th><th>Carta</th><th class="hide-sm">N&#176;</th><th class="hide-sm">Colore</th><th class="hide-sm">Cond. / Lingua</th><th class="num">Qt&#224;</th><th class="num">Prezzo</th></tr></thead>
+        <thead><tr><th></th><th></th><th>Carta</th><th class="hide-sm">Edizione / N&#176;</th><th class="hide-sm">Colore</th><th class="hide-sm">Cond. / Lingua</th><th class="num">Qt&#224;</th><th class="num">Prezzo</th></tr></thead>
         <tbody id="rows"></tbody>
       </table></div>
       <details id="missingBox" hidden><summary id="missingSum"></summary><div id="missingList"></div></details>
@@ -212,7 +233,8 @@
 <div id="zoom" hidden></div>
 <script src="config.js?v=2"></script>
 <script src="sync.js?v=3"></script>
-<script src="core.js?v=6"></script>
-<script src="app.js?v=10"></script>
+<script src="core.js?v=7"></script>
+<script src="deckcore.js?v=7"></script>
+<script src="app.js?v=11"></script>
 </body>
 </html>

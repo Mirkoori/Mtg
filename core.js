@@ -372,6 +372,175 @@ const Core = (() => {
     };
   }
 
+  // ---- modalita' "lista di carte": per ogni carta l'offerta CardTrader Zero piu' economica
+  let scLast = 0;
+  async function scGap() { const g = 110 - (Date.now() - scLast); if (g > 0) await sleep(g); scLast = Date.now(); }
+  async function scSearch(q, extra) {
+    await scGap();
+    try { return (await httpJson('GET', config.scryBase + '/cards/search?' + new URLSearchParams({ q, ...extra }), { retries: 1 })).data || []; }
+    catch (e) { if (e instanceof ApiError && e.status === 404) return []; throw e; }
+  }
+  async function scFuzzy(name) {
+    await scGap();
+    try { return await httpJson('GET', config.scryBase + '/cards/named?' + new URLSearchParams({ fuzzy: name }), { retries: 1 }); }
+    catch (e) { if (e instanceof ApiError && (e.status === 404 || e.status === 400)) return null; throw e; }
+  }
+  async function scCollection(idents) {
+    const out = [];
+    for (let i = 0; i < idents.length; i += 75) {
+      await scGap();
+      const d = await httpJson('POST', config.scryBase + '/cards/collection', { body: { identifiers: idents.slice(i, i + 75) }, retries: 1 });
+      out.push(...(d.data || []));
+    }
+    return out;
+  }
+  const printedName = c => c.printed_name || (c.card_faces || []).map(f => f.printed_name || f.name || '').filter(Boolean).join(' // ') || '';
+  const qName = n => String(n).replace(/["\\]/g, '');
+  const cnKey = v => String(v == null ? '' : v).trim().toLowerCase().replace(/^0+(?=\d)/, '');
+  const eurOf = c => { const p = c && c.prices; if (!p) return null; const v = parseFloat(p.eur) || parseFloat(p.eur_foil); return v > 0 ? v : null; };
+  const imgOf = c => (c.image_uris || (c.card_faces && c.card_faces[0] && c.card_faces[0].image_uris) || {});
+
+  // nome scritto dall'utente (italiano o inglese) -> carta Scryfall (nome inglese)
+  async function resolveNames(names, progress) {
+    const res = new Map();
+    const reg = (key, c) => { if (!res.has(key)) res.set(key, c); };
+    for (const c of await scCollection(names.map(n => ({ name: n })))) nameKeys(c.name).forEach(k => reg(k, c));
+    const left = names.filter(n => !res.has(norm(n))).slice(0, 80);
+    let i = 0;
+    for (const n of left) {
+      progress(`Cerco le carte non riconosciute ${++i}/${left.length}\u2026`);
+      const hits = await scSearch(`lang:it "${qName(n)}"`, { unique: 'cards' });
+      const exact = hits.find(c => norm(printedName(c)) === norm(n) || nameKeys(printedName(c)).has(norm(n)));
+      if (exact) { reg(norm(n), exact); continue; }
+      const f = await scFuzzy(n);
+      if (f && f.name) reg(norm(n), f);
+    }
+    return res;
+  }
+
+  let expIdx = null;
+  async function expansionIndex(token) {
+    if (expIdx && Date.now() - expIdx.t < 600000) return expIdx.v;
+    const list = await expansions(token);
+    const v = { byCode: new Map(), byName: new Map() };
+    list.forEach(e => { v.byCode.set(e.code.toLowerCase(), e); v.byName.set(norm(e.name), e); });
+    expIdx = { t: Date.now(), v };
+    return v;
+  }
+  function pickBlueprint(bps, card) {
+    const keys = nameKeys(card.name);
+    const m = bps.filter(b => [...nameKeys(b.name || '')].some(k => keys.has(k)));
+    if (!m.length) return null;
+    return m.find(b => cnKey(bpProps(b).collector_number) === cnKey(card.collector_number)) || m[0];
+  }
+  async function fetchBpProducts(token, bpId, language, foil) {
+    const params = { blueprint_id: bpId };
+    if (language) params.language = language;
+    if (foil !== null && foil !== undefined) params.foil = foil ? 'true' : 'false';
+    await mpWait();
+    const d = await ct('GET', '/marketplace/products', token, params);
+    if (Array.isArray(d)) return d;
+    const out = [];
+    Object.values(d || {}).forEach(v => { if (Array.isArray(v)) out.push(...v); });
+    return out;
+  }
+
+  async function buildListPlan(token, p, progress = () => {}) {
+    const ownedMode = p.owned_mode === 'none' ? 'none' : 'any'; // senza espansione "stessa espansione" non ha senso
+    const mode = LANG_PASSES[p.language_mode] ? p.language_mode : 'it_en';
+    const foilOpt = p.foil || 'no';
+    const o = { foil: foilOpt, maxCondRank: COND[p.min_condition || 'Near Mint'] ?? 1, maxPriceCents: Math.round((parseFloat(p.max_price) || 0) * 100) };
+    const foilParam = foilOpt === 'no' ? false : foilOpt === 'yes' ? true : null;
+    const own = parseOwned(p.owned);
+
+    const wanted = new Map();
+    for (const r of p.items || []) {
+      const k = norm(r.name); if (!k) continue;
+      const w = wanted.get(k) || { name: r.name, qty: 0 };
+      w.qty += Math.max(1, parseInt(r.qty) || 1); wanted.set(k, w);
+    }
+    progress('Riconosco le carte della lista\u2026');
+    const res = await resolveNames([...wanted.values()].map(w => w.name), progress);
+    const missing = [], skippedOwned = [], toBuy = new Map();
+    for (const w of wanted.values()) {
+      const c = res.get(norm(w.name));
+      if (!c) { missing.push({ name_it: w.name, name_en: w.name, reason: 'carta non riconosciuta (controlla il nome)' }); continue; }
+      const e = toBuy.get(c.name) || { card: c, qty: 0, label: w.name };
+      e.qty += w.qty; toBuy.set(c.name, e);
+    }
+    for (const [name, e] of [...toBuy.entries()]) {
+      const keys = new Set(nameKeys(name)); keys.add(norm(e.label));
+      e.have = ownedCount(keys, own, '', ownedMode);
+      e.need = Math.max(0, e.qty - e.have);
+      if (e.need === 0) { skippedOwned.push({ name_it: e.label, name_en: name, owned: e.have }); toBuy.delete(name); }
+    }
+
+    const idx = await expansionIndex(token);
+    const items = [];
+    let n = 0;
+    for (const e of toBuy.values()) {
+      progress(`Cerco l'offerta pi\u00f9 economica ${++n}/${toBuy.size}: ${e.card.name}`);
+      let prints = (await scSearch(`!"${qName(e.card.name)}" game:paper`, { unique: 'prints', order: 'eur', dir: 'asc' })).filter(c => !c.digital);
+      prints.sort((a, b) => (eurOf(a) ?? 1e9) - (eurOf(b) ?? 1e9));
+      let best = null, anyExp = false;
+      for (const lang of LANG_PASSES[mode]) {
+        let checked = 0, bestL = null;
+        for (let i = 0; i < prints.length && checked < 8; i++) {
+          const pr = prints[i];
+          const ex = idx.byCode.get((pr.set || '').toLowerCase()) || idx.byName.get(norm(pr.set_name));
+          if (!ex) continue;
+          anyExp = true;
+          let bps;
+          try { bps = singleCards(await getBlueprints(token, ex.id)); }
+          catch (er) { if (er instanceof ApiError && er.status === 404) continue; throw er; }
+          const b = pickBlueprint(bps, pr); if (!b) continue;
+          checked++;
+          for (const prod of await fetchBpProducts(token, b.id, lang, foilParam))
+            if (productOk(prod, o, lang, e.need) && (!bestL || prod.price.cents < bestL.prod.price.cents)) bestL = { b, prod, pr };
+          const nextP = prints[i + 1] ? eurOf(prints[i + 1]) : null;
+          if (bestL && (checked >= 3 || (nextP !== null && bestL.prod.price.cents / 100 <= nextP))) break;
+        }
+        if (bestL) { best = bestL; break; }
+      }
+      if (!best) { missing.push({ name_it: e.label, name_en: e.card.name, reason: anyExp ? 'nessuna offerta CardTrader Zero con questi filtri' : 'edizioni non trovate su CardTrader' }); continue; }
+      const { b, prod, pr } = best, ph = prod.properties_hash || {}, im = imgOf(pr);
+      const faces = pr.card_faces || [];
+      items.push({
+        name_it: e.card.name, name_en: e.card.name, version: b.version || null,
+        collector_number: bpProps(b).collector_number || pr.collector_number || null,
+        rarity: pr.rarity ? pr.rarity.charAt(0).toUpperCase() + pr.rarity.slice(1) : null,
+        color: colorCode(pr.colors || (faces[0] && faces[0].colors) || []),
+        blueprint_id: b.id, product_id: prod.id, qty: e.need, have: e.have,
+        price_cents: prod.price.cents, currency: prod.price.currency || 'EUR',
+        condition: ph.condition, language: ph.mtg_language, foil: !!ph.mtg_foil,
+        set_code: (pr.set || '').toLowerCase(), set_name: pr.set_name || '', img: im.small || im.normal || '', img_big: im.normal || im.small || '',
+      });
+    }
+
+    let italian = false;
+    if (items.length) {
+      progress('Scarico i nomi italiani\u2026');
+      const map = {};
+      const names = [...new Set(items.map(i => i.name_en))];
+      try {
+        for (let i = 0; i < names.length; i += 15) {
+          const q = '(' + names.slice(i, i + 15).map(x => `!"${qName(x)}"`).join(' or ') + ') lang:it';
+          for (const c of await scSearch(q, { unique: 'cards' })) { const pn = printedName(c); if (pn) map[c.name] = pn; }
+        }
+      } catch (er) { /* restano i nomi inglesi */ }
+      items.forEach(it => { if (map[it.name_en]) { it.name_it = map[it.name_en]; italian = true; } });
+      missing.forEach(m => { if (map[m.name_en]) m.name_it = map[m.name_en]; });
+    }
+    const byName = (a, b) => norm(a.name_it).localeCompare(norm(b.name_it));
+    items.sort(byName); missing.sort(byName); skippedOwned.sort(byName);
+    return {
+      list: true, items, missing, skipped_owned: skippedOwned,
+      total_cents: items.reduce((a, i) => a + i.price_cents * i.qty, 0),
+      currency: items.length ? items[0].currency : 'EUR',
+      italian_names: italian, color_unavailable: false, text_unavailable: false,
+    };
+  }
+
   function cartSummary(cart) {
     let count = 0, subtotal = null;
     if (cart && typeof cart === 'object') {
@@ -386,7 +555,7 @@ const Core = (() => {
     cartSummary(await ct('POST', '/cart/add', token, null,
       { product_id: parseInt(productId), quantity: parseInt(quantity) || 1, via_cardtrader_zero: true }));
 
-  return { config, ApiError, info, expansions, expansionInfo, buildPlan, cart, cartAdd, norm, nameKeys };
+  return { config, ApiError, info, expansions, expansionInfo, buildPlan, buildListPlan, cart, cartAdd, norm, nameKeys };
 })();
 
 if (typeof module !== 'undefined') module.exports = Core;
