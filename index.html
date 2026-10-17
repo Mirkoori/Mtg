@@ -48,6 +48,10 @@
   th { color:var(--muted); font-weight:600; position:sticky; top:0; background:var(--card); }
   td.num, th.num { text-align:right; white-space:nowrap; }
   .en { color:var(--muted); font-size:12px; }
+  .thumb { width:46px; aspect-ratio:488/680; border-radius:4px; background:var(--line); display:block; cursor:zoom-in; object-fit:cover; }
+  #zoom { position:fixed; inset:0; background:rgba(0,0,0,.75); z-index:50; display:grid; place-items:center; padding:14px; cursor:zoom-out; }
+  #zoom[hidden] { display:none; }
+  #zoom img { max-width:min(92vw,420px); max-height:88vh; border-radius:14px; }
   .tablewrap { max-height:60vh; overflow:auto; border:1px solid var(--line); border-radius:8px; margin-top:10px; }
   .summary { display:flex; gap:22px; flex-wrap:wrap; margin-top:8px; }
   .summary b { font-size:18px; display:block; } .summary span { color:var(--muted); font-size:12px; }
@@ -186,7 +190,7 @@
     <div id="previewBox" hidden>
       <div class="summary" id="summary"></div>
       <div class="tablewrap"><table>
-        <thead><tr><th></th><th>Carta</th><th class="hide-sm">N&#176;</th><th class="hide-sm">Colore</th><th class="hide-sm">Cond. / Lingua</th><th class="num">Qt&#224;</th><th class="num">Prezzo</th></tr></thead>
+        <thead><tr><th></th><th></th><th>Carta</th><th class="hide-sm">N&#176;</th><th class="hide-sm">Colore</th><th class="hide-sm">Cond. / Lingua</th><th class="num">Qt&#224;</th><th class="num">Prezzo</th></tr></thead>
         <tbody id="rows"></tbody>
       </table></div>
       <details id="missingBox" hidden><summary id="missingSum"></summary><div id="missingList"></div></details>
@@ -202,7 +206,8 @@
   </section>
 </main>
 
+<div id="zoom" hidden></div>
 <script src="core.js?v=6"></script>
-<script src="app.js?v=7"></script>
+<script src="app.js?v=8"></script>
 </body>
 </html>

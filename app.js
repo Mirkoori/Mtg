@@ -157,12 +157,14 @@ function renderPlan() {
   const p = state.plan; $('previewBox').hidden = false;
   $('rows').innerHTML = p.items.map((it, i) => `<tr>
     <td><input type="checkbox" data-i="${i}" checked></td>
+    <td><img class="thumb" data-img="${i}" alt="" hidden></td>
     <td>${esc(it.name_it)}${it.version ? ' <span class="en">(' + esc(it.version) + ')</span>' : ''}${it.name_it !== it.name_en ? '<div class="en">' + esc(it.name_en) + '</div>' : ''}</td>
     <td class="hide-sm">${esc(it.collector_number || '')}</td>
     <td class="hide-sm">${esc(colorLabel(it.color))}</td>
     <td class="hide-sm">${esc(it.condition)} \u00b7 ${esc((it.language || '').toUpperCase())}${it.foil ? ' \u00b7 foil' : ''}</td>
     <td class="num">${it.qty}</td><td class="num">${money(it.price_cents, it.currency)}</td></tr>`).join('');
   $('rows').querySelectorAll('input').forEach(c => c.onchange = updateSummary);
+  loadImages(p.items);
   const miss = p.missing;
   $('missingBox').hidden = !miss.length;
   $('missingSum').textContent = `${miss.length} carte non trovate con questi filtri`;
@@ -185,6 +187,57 @@ function updateSummary() {
   $('btnAdd').disabled = !sel.length;
   $('btnAdd').textContent = `Aggiungi ${cards} carte al carrello`;
 }
+
+// ---- immagini delle carte (Scryfall)
+const imgCache = {};
+function cardImgs(c) {
+  const u = c.image_uris || (c.card_faces && c.card_faces[0] && c.card_faces[0].image_uris) || null;
+  return u ? { s: u.small, l: u.normal } : null;
+}
+async function scryCollection(ids) {
+  const out = [], nf = [];
+  for (let i = 0; i < ids.length; i += 75) {
+    const r = await fetch('https://api.scryfall.com/cards/collection', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ identifiers: ids.slice(i, i + 75) }) });
+    if (!r.ok) throw new Error('scryfall ' + r.status);
+    const d = await r.json(); out.push(...(d.data || [])); nf.push(...(d.not_found || []));
+    await new Promise(res => setTimeout(res, 120));
+  }
+  return { data: out, notFound: nf };
+}
+async function loadImages(items) {
+  const code = ((state.expansion && state.expansion.code) || '').toLowerCase();
+  const keyOf = it => code + '|' + (it.collector_number || '') + '|' + it.name_en;
+  const apply = () => $('rows').querySelectorAll('img[data-img]').forEach(im => {
+    const it = items[+im.dataset.img]; const x = it && imgCache[keyOf(it)];
+    if (x && im.hidden) { im.src = x.s; im.hidden = false; }
+  });
+  try {
+    const need = items.filter(it => !imgCache[keyOf(it)]);
+    if (!need.length) return apply();
+    const ids = need.filter(it => it.collector_number).map(it => ({ set: code, collector_number: String(it.collector_number) }));
+    if (ids.length) {
+      const r = await scryCollection(ids);
+      r.data.forEach(c => { const im = cardImgs(c); if (im) imgCache[code + '|' + c.collector_number + '|' + c.name.split(' // ')[0]] = im; if (im) imgCache['n|' + c.collector_number] = im; });
+      need.forEach(it => { const im = imgCache['n|' + it.collector_number]; if (im && !imgCache[keyOf(it)]) imgCache[keyOf(it)] = im; });
+    }
+    const left = need.filter(it => !imgCache[keyOf(it)]);
+    if (left.length) {
+      const r2 = await scryCollection(left.map(it => ({ name: it.name_en.split(' // ')[0], set: code })));
+      r2.data.forEach(c => { const im = cardImgs(c); if (!im) return; left.forEach(it => { if (it.name_en.split(' // ')[0].toLowerCase() === c.name.split(' // ')[0].toLowerCase()) imgCache[keyOf(it)] = im; }); });
+    }
+    apply();
+  } catch (e) { apply(); }
+}
+document.addEventListener('click', e => {
+  const im = e.target.closest('img[data-img]');
+  if (im && state.plan) {
+    const it = state.plan.items[+im.dataset.img]; const code = ((state.expansion && state.expansion.code) || '').toLowerCase();
+    const x = it && imgCache[code + '|' + (it.collector_number || '') + '|' + it.name_en];
+    if (x) { $('zoom').innerHTML = '<img src="' + x.l + '" alt="">'; $('zoom').hidden = false; }
+    return;
+  }
+  if (e.target.closest('#zoom')) $('zoom').hidden = true;
+});
 
 // ---- esportazione CSV (per chiedere le carte a un amico prima di comprarle)
 function csvCell(v) { v = String(v == null ? '' : v); return /[";\r\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; }
