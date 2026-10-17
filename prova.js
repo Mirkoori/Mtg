@@ -4,7 +4,9 @@ const $ = id => document.getElementById(id);
 const jget = (k, d) => { try { const v = JSON.parse(localStorage.getItem(k)); return v == null ? d : v; } catch (e) { return d; } };
 const DECKS = jget('mtg_decks', []);
 const CARDS = jget('mtg_cards', {});
-const G = { lib: [], hand: [], bf: [], gy: [], ex: [], cmd: [], life: 20, pois: 0, turn: 1, log: [], hist: [], uid: 0, deck: null, mulls: 0 };
+const mkP = d => ({ deck: d, name: d.name, lib: [], hand: [], bf: [], gy: [], ex: [], cmd: [], life: 20, pois: 0, turn: 1, log: [], hist: [], uid: 0, mulls: 0 });
+let PL = [], cur = 0, G = mkP({ name: '' }), mode = 'solo', remote = null, started = false;
+let peer = null, conn = null, syncT = null;
 const nm = c => (c.token ? c.name : ((CARDS[c.id] && (CARDS[c.id].name_it || CARDS[c.id].name)) || '?'));
 const data = c => CARDS[c.id] || {};
 let toastT = null;
@@ -17,25 +19,35 @@ const mk = id => ({ uid: ++G.uid, id: id, tapped: false, cnt: 0 });
 
 function fillDecks() {
   const sel = $('deckSel');
+  const sel2 = $('deck2Sel');
   if (!DECKS.length) { sel.innerHTML = '<option>Nessun mazzo salvato</option>'; $('btnStart').disabled = true; $('setupMsg').innerHTML = 'Crea prima un mazzo nella pagina <a href="mazzi.html">Mazzi</a>.'; return; }
   const cur = localStorage.getItem('mtg_cur');
+  const opts = cur0 => DECKS.map(d => '<option value="' + esc(d.id) + '"' + (d.id === cur0 ? ' selected' : '') + '>' + esc(d.name) + ' (' + esc((Deck.FORMATS[d.format] || {}).name || d.format) + ')</option>').join('');
+  sel2.innerHTML = opts(DECKS[DECKS.length > 1 ? 1 : 0].id === cur ? DECKS[0].id : DECKS[DECKS.length > 1 ? 1 : 0].id);
   sel.innerHTML = DECKS.map(d => '<option value="' + esc(d.id) + '"' + (d.id === cur ? ' selected' : '') + '>' + esc(d.name) + ' (' + esc((Deck.FORMATS[d.format] || {}).name || d.format) + ')</option>').join('');
 }
 
-function start() {
-  const d = DECKS.find(x => x.id === $('deckSel').value); if (!d) return;
-  G.deck = d; G.hist = []; G.log = []; G.uid = 0; G.mulls = 0;
-  G.lib = []; G.hand = []; G.bf = []; G.gy = []; G.ex = []; G.cmd = [];
+function build(d) {
+  const p = mkP(d);
+  const keep = G; G = p;
   d.cards.forEach(e => {
     if (e.section === 'side') return;
-    for (let i = 0; i < e.qty; i++) (e.section === 'commander' ? G.cmd : G.lib).push(mk(e.id));
+    for (let i = 0; i < e.qty; i++) (e.section === 'commander' ? p.cmd : p.lib).push(mk(e.id));
   });
-  if (!G.lib.length) { $('setupMsg').textContent = 'Il mazzo e vuoto.'; return; }
   const fm = Deck.FORMATS[d.format] || {};
-  G.life = fm.commander ? 40 : 20; G.pois = 0; G.turn = 1;
-  shuffle(G.lib); draw(7, true);
+  p.life = fm.commander ? 40 : 20;
+  shuffle(p.lib); draw(7, true); say('Nuova partita con ' + d.name);
+  G = keep; return p;
+}
+function start() {
+  const d = DECKS.find(x => x.id === $('deckSel').value); if (!d) return;
+  const d2 = DECKS.find(x => x.id === $('deck2Sel').value);
+  if (!d.cards.some(e => e.section !== 'side')) { $('setupMsg').textContent = 'Il mazzo e vuoto.'; return; }
+  mode = $('modeSel').value; cur = 0;
+  PL = [build(d)]; if (mode === 'local') { if (!d2) return; PL.push(build(d2)); }
+  G = PL[0]; started = true;
   $('setupMsg').textContent = ''; $('game').hidden = false; $('hand').hidden = false;
-  say('Nuova partita con ' + d.name); render();
+  render(); sync();
 }
 function draw(n, quiet) {
   for (let i = 0; i < n; i++) { const c = G.lib.shift(); if (!c) { toast('Grimorio finito'); break; } G.hand.push(c); }
@@ -76,6 +88,74 @@ function render() {
   $('zCmd').hidden = !G.cmd.length;
   $('turn').textContent = G.turn; $('life').textContent = G.life; $('pois').textContent = G.pois;
   $('log').innerHTML = G.log.map(esc).join('<br>');
+  $('whoBar').hidden = mode !== 'local'; $('whoName').textContent = 'Sta giocando: ' + G.name + (cur ? ' (giocatore 2)' : ' (giocatore 1)');
+  $('handTitle').textContent = mode === 'local' ? 'Mano di ' + G.name : 'Mano';
+  renderOpp(); sync();
+}
+function laneOf(c) { const d = data(c); return c.token ? (c.isCre ? 'c' : 'o') : (Deck.isLand(d) ? 'l' : (/Creature/.test(d.type || '') ? 'c' : 'o')); }
+function pc(c) { const d = data(c); return { u: c.uid, t: c.tapped ? 1 : 0, n: c.cnt, k: laneOf(c), nm: nm(c), i: c.token ? '' : (d.img || ''), ib: c.token ? '' : (d.imgBig || d.img || ''), pt: c.pt || '', ty: d.type_it || d.type || '', tx: String(d.text_it || d.text || '').slice(0, 400) }; }
+function pub(p) { return { name: p.name, life: p.life, pois: p.pois, turn: p.turn, nLib: p.lib.length, nHand: p.hand.length, bf: p.bf.map(pc), gy: p.gy.map(pc), ex: p.ex.map(pc), cmd: p.cmd.map(pc), last: p.log[0] || '' }; }
+function ocard(c, z) {
+  const img = c.i ? '<img loading="lazy" src="' + esc(c.i) + '" alt="' + esc(c.nm) + '">' : '<div class="noimg">' + esc(c.nm) + (c.pt ? '<br>' + esc(c.pt) : '') + '</div>';
+  return '<div class="card' + (c.t ? ' tapped' : '') + '" data-oz="' + z + '" data-ou="' + c.u + '">' + img + (c.n ? '<span class="cb">' + (c.n > 0 ? '+' : '') + c.n + '</span>' : '') + '</div>';
+}
+function oppData() { return mode === 'online' ? remote : mode === 'local' && PL[1 - cur] ? pub(PL[1 - cur]) : null; }
+function renderOpp() {
+  const o = oppData(); const box = $('oppBox');
+  if (mode === 'solo' || (!o && mode !== 'online')) { box.hidden = true; return; }
+  box.hidden = false;
+  if (!o) { $('oppName').textContent = 'In attesa dell\'avversario...'; ['oLaneOther', 'oLaneCreature', 'oLaneLand'].forEach(k => { $(k).innerHTML = ''; }); return; }
+  $('oppName').textContent = o.name || 'Avversario'; $('oLife').textContent = o.life; $('oPois').textContent = o.pois; $('oTurn').textContent = o.turn;
+  $('oGy').textContent = o.gy.length; $('oEx').textContent = o.ex.length; $('oCmd').textContent = o.cmd.length; $('oCmdB').hidden = !o.cmd.length;
+  $('oHand').textContent = o.nHand; $('oLib').textContent = o.nLib; $('oLast').textContent = o.last || '';
+  const m = { o: 'oLaneOther', c: 'oLaneCreature', l: 'oLaneLand' };
+  Object.keys(m).forEach(k => { $(m[k]).innerHTML = o.bf.filter(c => c.k === k).map(c => ocard(c, 'bf')).join('') || '<span class="msg">vuoto</span>'; });
+}
+function oppSheet(c) {
+  openSheet('<div class="big">' + (c.ib ? '<img src="' + esc(c.ib) + '" alt="">' : '<div class="noimg" style="width:220px">' + esc(c.nm) + '</div>') + '<div style="flex:1;min-width:200px"><h3 style="margin:0">' + esc(c.nm) + '</h3><div class="msg">' + esc(c.ty) + '</div><div class="otext">' + esc(c.tx).replace(/\n/g, '<br>') + '</div></div></div>');
+  $('sBody').dataset.z = ''; $('sBody').dataset.u = '';
+}
+function oppZone(z) {
+  const o = oppData(); if (!o) return; const arr = o[z] || [];
+  openSheet('<h3 style="margin:0">' + ({ gy: 'Cimitero', ex: 'Esilio', cmd: 'Comando' })[z] + ' di ' + esc(o.name) + ' (' + arr.length + ')</h3><div class="sgrid">' + (arr.map(c => ocard(c, z)).join('') || '<span class="msg">vuoto</span>') + '</div>');
+  $('sBody').dataset.oz = z;
+}
+// ---------- Online (PeerJS, collegamento diretto fra i due dispositivi)
+const netMsg = t => { $('netMsg').textContent = t; };
+function sync() {
+  if (!conn || !conn.open || !started) return;
+  clearTimeout(syncT); syncT = setTimeout(() => { try { conn.send({ t: 's', s: pub(G) }); } catch (e) { /* ignora */ } }, 120);
+}
+function loadPeer(cb) {
+  if (window.Peer) { cb(); return; }
+  const s = document.createElement('script'); s.src = 'https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.4/peerjs.min.js';
+  s.onload = cb; s.onerror = () => netMsg('Non riesco a caricare il collegamento online. Controlla la rete.'); document.head.appendChild(s);
+}
+function attach(c) {
+  conn = c;
+  c.on('open', () => { netMsg('Collegato con l\'avversario. Premi "Nuova partita".'); sync(); renderOpp(); });
+  c.on('data', m => { if (m && m.t === 's') { remote = m.s; renderOpp(); } });
+  c.on('close', () => { remote = null; netMsg('Avversario disconnesso.'); renderOpp(); });
+  c.on('error', () => netMsg('Errore di collegamento.'));
+}
+function hostRoom() {
+  loadPeer(() => {
+    const code = Math.random().toString(36).replace(/[^a-z]/g, '').slice(0, 4).toUpperCase().padEnd(4, 'X');
+    if (peer) peer.destroy();
+    peer = new Peer('mtgprova-' + code);
+    peer.on('open', () => netMsg('Stanza ' + code + ' creata: passa il codice al tuo amico e aspetta.'));
+    peer.on('connection', attach);
+    peer.on('error', e => netMsg('Errore: ' + (e.type || e) + (e.type === 'unavailable-id' ? ' (riprova)' : '')));
+  });
+}
+function joinRoom() {
+  const code = $('joinCode').value.trim().toUpperCase(); if (!code) { netMsg('Scrivi il codice della stanza.'); return; }
+  loadPeer(() => {
+    if (peer) peer.destroy();
+    peer = new Peer();
+    peer.on('open', () => { netMsg('Mi collego...'); attach(peer.connect('mtgprova-' + code, { reliable: true })); });
+    peer.on('error', e => netMsg('Errore: ' + (e.type || e) + (e.type === 'peer-unavailable' ? ' (codice non trovato)' : '')));
+  });
 }
 
 function openSheet(html) { $('sBody').innerHTML = html; $('sheet').hidden = false; document.body.classList.add('noscroll'); }
@@ -139,6 +219,9 @@ document.addEventListener('click', e => {
     if (z === 'bf' && !$('sheet').hidden) { cardMenu(z, uid); return; }
     cardMenu(z, uid); return;
   }
+  const oc = t.closest('[data-ou]');
+  if (oc) { const o = oppData(); const z = oc.dataset.oz; const c = o && (o[z] || []).find(x => x.u === +oc.dataset.ou); if (c) oppSheet(c); return; }
+  const oz = t.closest('[data-ozone]'); if (oz) { oppZone(oz.dataset.ozone); return; }
   const zb = t.closest('[data-zone]'); if (zb) { zoneView(zb.dataset.zone); return; }
   const li = t.closest('[data-life]'); if (li) { snap(); G.life += +li.dataset.life; say('vita ' + G.life); render(); return; }
   const po = t.closest('[data-pois]'); if (po) { snap(); G.pois = Math.max(0, G.pois + +po.dataset.pois); render(); return; }
@@ -156,4 +239,7 @@ $('btnToken').onclick = addToken;
 $('btnProb').onclick = probs;
 $('btnTurn').onclick = nextTurn;
 $('btnUndo').onclick = undo;
+$('modeSel').onchange = () => { const m = $('modeSel').value; $('deck2Box').hidden = m !== 'local'; $('onlineBox').hidden = m !== 'online'; };
+$('btnHost').onclick = hostRoom; $('btnJoin').onclick = joinRoom;
+$('btnSwap').onclick = () => { cur = 1 - cur; G = PL[cur]; render(); window.scrollTo(0, 0); toast('Ora gioca ' + G.name); };
 fillDecks();

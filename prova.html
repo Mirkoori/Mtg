@@ -76,15 +76,48 @@
   <h1>Campo di prova</h1>
 
   <section class="panel" id="setup">
-    <div class="msg">Pesca, gioca e gira le carte per provare un mazzo da solo. Le regole non sono controllate: sei tu a muovere le carte.</div>
+    <div class="msg">Pesca, gioca e gira le carte. Le regole non sono controllate: sei tu a muovere le carte.</div>
     <div class="row">
-      <select id="deckSel" aria-label="Mazzo"></select>
-      <button id="btnStart">Nuova partita</button>
+      <select id="modeSel" aria-label="Modalit&#224;">
+        <option value="solo">Da solo (prova la mano)</option>
+        <option value="local">Due mazzi sullo stesso dispositivo</option>
+        <option value="online">Online con un amico</option>
+      </select>
     </div>
+    <div class="row">
+      <select id="deckSel" aria-label="Il tuo mazzo"></select>
+    </div>
+    <div class="row" id="deck2Box" hidden>
+      <select id="deck2Sel" aria-label="Mazzo dell'avversario"></select>
+    </div>
+    <div id="onlineBox" hidden>
+      <div class="row">
+        <button class="secondary" id="btnHost">Crea stanza</button>
+        <input type="text" id="joinCode" placeholder="Codice stanza" autocomplete="off" autocapitalize="characters" style="width:140px">
+        <button class="secondary" id="btnJoin">Entra</button>
+      </div>
+      <div class="msg" id="netMsg">Uno crea la stanza e passa il codice all'altro. Poi ognuno preme "Nuova partita" con il proprio mazzo.</div>
+    </div>
+    <div class="row"><button id="btnStart">Nuova partita</button></div>
     <div class="msg" id="setupMsg"></div>
   </section>
 
   <div id="game" hidden>
+    <div class="panel" id="oppBox" hidden>
+      <div class="bar" style="margin-bottom:6px"><b id="oppName">Avversario</b>
+        <span class="stat">Vita <b id="oLife">20</b></span><span class="stat">Veleno <b id="oPois">0</b></span>
+        <span class="stat">Turno <b id="oTurn">1</b></span>
+        <button class="small secondary" data-ozone="gy">Cimitero <span id="oGy">0</span></button>
+        <button class="small secondary" data-ozone="ex">Esilio <span id="oEx">0</span></button>
+        <button class="small secondary" data-ozone="cmd" id="oCmdB">Comando <span id="oCmd">0</span></button>
+        <span class="msg">Mano <b id="oHand">0</b> &middot; Grimorio <b id="oLib">0</b></span>
+      </div>
+      <div class="field" style="margin-bottom:6px"><h3>Permanenti</h3><div class="lane" id="oLaneOther"></div></div>
+      <div class="field" style="margin-bottom:6px"><h3>Creature</h3><div class="lane" id="oLaneCreature"></div></div>
+      <div class="field" style="margin-bottom:0"><h3>Terre</h3><div class="lane" id="oLaneLand"></div></div>
+      <div class="msg" id="oLast"></div>
+    </div>
+    <div class="bar" id="whoBar" hidden style="margin-bottom:10px"><b id="whoName"></b><button class="small" id="btnSwap">Passa all'altro giocatore</button></div>
     <div class="panel bar" id="topbar">
       <span class="stat">Turno <b id="turn">1</b><button id="btnTurn" style="width:auto;padding:0 8px;border-radius:12px;background:var(--accent);color:var(--accent-ink)">Prossimo</button></span>
       <span class="stat">Vita <button data-life="-5">-5</button><button data-life="-1">-</button><b id="life">20</b><button data-life="1">+</button><button data-life="5">+5</button></span>
@@ -118,6 +151,6 @@
 <div id="toast" hidden></div>
 <script src="deckcore.js?v=8"></script>
 <script src="scry.js?v=8"></script>
-<script src="prova.js?v=8"></script>
+<script src="prova.js?v=9"></script>
 </body>
 </html>
