@@ -91,6 +91,10 @@
   .otext { background:var(--bg); border-radius:8px; padding:8px 10px; margin:8px 0; font-size:14px; }
   .meta { font-size:13px; color:var(--muted); margin-top:3px; } .okc { color:var(--ok); } .badc { color:var(--bad); }
   .mact { display:flex; gap:8px; flex-wrap:wrap; margin-top:12px; } .mact select { width:auto; flex:1 1 140px; }
+  .chips { display:flex; flex-wrap:wrap; gap:6px; margin-top:4px; }
+  .chip { border:1px solid var(--line); border-radius:999px; padding:4px 11px; font-size:14px; display:flex; gap:5px; align-items:center; background:var(--bg); cursor:pointer; user-select:none; }
+  .chip.on { border-color:var(--accent); background:var(--accent); color:var(--accent-ink); }
+  input.num { width:72px; padding:8px 10px; border:1px solid var(--line); border-radius:8px; background:var(--bg); color:var(--ink); font:inherit; font-size:16px; }
   #toast { position:fixed; left:50%; bottom:22px; transform:translateX(-50%); background:#222; color:#fff; padding:9px 16px; border-radius:20px; font-size:14px; z-index:30; max-width:90%; text-align:center; }
   #empty { text-align:center; color:var(--muted); padding:30px 10px; }
   @media (max-width:520px) { .barrow { grid-template-columns:96px 1fr 24px 46px; } }
@@ -99,7 +103,7 @@
 <body>
 <main>
   <nav><a href="index.html">Carrello</a><a href="mazzi.html" class="on">Mazzi</a><a href="collezione.html">Collezione</a></nav>
-  <h1>I miei mazzi <small style="font-size:11px;color:var(--muted);font-weight:400">v6</small></h1>
+  <h1>I miei mazzi <small style="font-size:11px;color:var(--muted);font-weight:400">v7</small></h1>
 
   <section>
     <div class="row" style="margin-top:0">
@@ -132,10 +136,40 @@
 
   <section id="searchPanel" hidden>
     <form id="searchForm" class="row" style="margin-top:0">
-      <input id="q" type="text" placeholder="Nome o testo, es. angelo, o t:angel c:w cmc&lt;=3" style="flex:3 1 220px" autocomplete="off" enterkeyhint="search">
+      <input id="q" type="text" placeholder="Nome o tipo, es. angelo (puoi lasciarlo vuoto e usare i filtri)" style="flex:3 1 220px" autocomplete="off" enterkeyhint="search">
       <button type="submit">Cerca</button>
       <button type="button" class="secondary" id="closeSearch">Chiudi</button>
     </form>
+    <details id="advBox" style="margin-top:10px">
+      <summary>Filtri: colore, costo di mana, tipo<span id="filtBadge"></span></summary>
+      <div class="msg" style="margin-top:8px">Colore</div>
+      <div class="chips" id="fColors">
+        <span class="chip" data-c="W"><span class="pip pW">W</span>Bianco</span><span class="chip" data-c="U"><span class="pip pU">U</span>Blu</span>
+        <span class="chip" data-c="B"><span class="pip pB">B</span>Nero</span><span class="chip" data-c="R"><span class="pip pR">R</span>Rosso</span>
+        <span class="chip" data-c="G"><span class="pip pG">G</span>Verde</span><span class="chip" data-c="C">Incolore</span>
+      </div>
+      <div class="row"><select id="fColMode" aria-label="Come usare i colori">
+        <option value="any">Almeno uno di questi colori</option><option value="all">Tutti questi colori (anche altri)</option>
+        <option value="exact">Esattamente questi colori</option><option value="only">Solo questi colori (o incolore)</option></select></div>
+      <div class="row">
+        <label class="msg" for="fMvMin">Costo di mana da</label><input id="fMvMin" type="number" min="0" max="20" inputmode="numeric" class="num">
+        <label class="msg" for="fMvMax">a</label><input id="fMvMax" type="number" min="0" max="20" inputmode="numeric" class="num">
+      </div>
+      <div class="row">
+        <select id="fType" aria-label="Tipo"><option value="">Tutti i tipi</option><option value="creature">Creatura</option><option value="instant">Istantaneo</option>
+          <option value="sorcery">Stregoneria</option><option value="artifact">Artefatto</option><option value="enchantment">Incantesimo</option>
+          <option value="planeswalker">Planeswalker</option><option value="land">Terra</option><option value="legendary">Leggendario</option><option value="battle">Battaglia</option></select>
+        <select id="fOrder" aria-label="Ordina per"><option value="name">Ordina: nome</option><option value="cmc">Ordina: costo di mana</option>
+          <option value="rarity">Ordina: rarit&#224;</option><option value="price">Ordina: prezzo</option><option value="released">Ordina: pi&#249; recenti</option></select>
+      </div>
+      <div class="msg" style="margin-top:8px">Rarit&#224;</div>
+      <div class="chips" id="fRars"><span class="chip" data-r="c">Comune</span><span class="chip" data-r="u">Non comune</span><span class="chip" data-r="r">Rara</span><span class="chip" data-r="m">Mitica</span></div>
+      <div class="row">
+        <input id="fSet" type="text" placeholder="Espansione (codice, es. dmu)" style="flex:1 1 180px" autocomplete="off" maxlength="6">
+        <input id="fText" type="text" placeholder="Testo della carta, in inglese (es. draw a card)" style="flex:2 1 220px" autocomplete="off">
+      </div>
+      <div class="row"><label class="chk"><input type="checkbox" id="fOwned"> Solo carte che ho gi&#224;</label><button type="button" class="link" id="fReset">Azzera i filtri</button></div>
+    </details>
     <div class="row">
       <label class="chk"><input type="checkbox" id="onlyLegal" checked> Solo carte legali nel formato</label>
       <label class="chk" style="flex:1">Aggiungi a&nbsp;<select id="target"></select></label>
@@ -155,8 +189,8 @@
 
 <div id="modal" hidden><div id="mBox"><button id="mClose" aria-label="Chiudi">&times;</button><div id="mBody"></div></div></div>
 <div id="toast" hidden></div>
-<script src="deckcore.js?v=6"></script>
-<script src="scry.js?v=6"></script>
-<script src="mazzi.js?v=6"></script>
+<script src="deckcore.js?v=7"></script>
+<script src="scry.js?v=7"></script>
+<script src="mazzi.js?v=7"></script>
 </body>
 </html>

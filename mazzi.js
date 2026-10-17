@@ -21,8 +21,9 @@ const nameOf = c => c.name_it || c.name;
 let toastTimer = null;
 function toast(t) { const el = $('toast'); el.textContent = t; el.hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(() => { el.hidden = true; }, 2200); }
 
-async function searchPages(q, maxPages) {
-  const params = '?' + new URLSearchParams({ q, unique: 'cards', order: 'name' }).toString();
+async function searchPages(q, maxPages, order, dir) {
+  const p = { q, unique: 'cards', order: order || 'name' }; if (dir) p.dir = dir;
+  const params = '?' + new URLSearchParams(p).toString();
   let r = await scry('/cards/search' + params);
   const data = (r.data || []).slice();
   let pages = 1;
@@ -30,19 +31,19 @@ async function searchPages(q, maxPages) {
   return data;
 }
 
-async function searchCards(q, onlyLegal, fmtScry, extra) {
+async function searchCards(q, onlyLegal, fmtScry, extra, order, dir) {
   const base = q.trim();
-  if (!base) return [];
+  if (!base && !extra) return [];
   const legal = (onlyLegal && fmtScry ? ' f:' + fmtScry : '') + (extra ? ' ' + extra : '');
   const out = [], seen = new Set();
   const add = list => list.forEach(c => { const s = slim(c); if (!seen.has(s.id)) { seen.add(s.id); out.push(s); } });
   const queries = [];
-  const typeEn = /[:=<>!"]/.test(base) ? [] : Deck.typeWordsEn(base);
+  const typeEn = !base || /[:=<>!"]/.test(base) ? [] : Deck.typeWordsEn(base);
   if (typeEn.length) queries.push(typeEn.map(t => 't:' + t).join(' ') + legal); // per tipo (es. chierico -> t:cleric)
-  queries.push(base + legal);                                                   // per nome
+  queries.push((base + legal).trim());                                          // per nome
   for (const qq of queries) {
-    add(await searchPages(qq + ' lang:it', 4));  // stampe italiane (nomi e testi in italiano)
-    add(await searchPages(qq, 4));               // tutte le altre carte, anche senza stampa italiana
+    add(await searchPages(qq + ' lang:it', 4, order, dir));  // stampe italiane (nomi e testi in italiano)
+    add(await searchPages(qq, 4, order, dir));               // tutte le altre carte, anche senza stampa italiana
   }
   return out;
 }
@@ -163,7 +164,7 @@ function renderResults() {
   const d = deck(); if (!d) return;
   const part = S.results.slice(0, S.shown);
   $('results').innerHTML = part.map((c, i) => `<div class="rtile"><a data-act="ropen" data-i="${i}">${c.img ? `<img loading="lazy" src="${esc(c.img)}" alt="${esc(nameOf(c))}">` : `<div class="noimg">${esc(nameOf(c))}</div>`}</a>
-    <div class="rn">${esc(nameOf(c))}</div><button data-act="radd" data-i="${i}">+ Aggiungi</button></div>`).join('');
+    <div class="rn">${esc(nameOf(c))}<div>${manaHtml(c.mana)}</div></div><button data-act="radd" data-i="${i}">+ Aggiungi</button></div>`).join('');
   $('more').hidden = S.results.length <= S.shown;
   $('more').textContent = `Mostra altre (${S.results.length - S.shown})`;
 }
@@ -294,14 +295,56 @@ $('target').onchange = () => {
   if (($('q').value.trim()) && (was === 'commander' || S.target === 'commander')) doSearch(); // il comandante ha una ricerca a parte
 };
 
+
+// ---------- filtri della ricerca
+const ADV = { colors: new Set(), rars: new Set() };
+const ORDERS = { name: ['name', 'asc'], cmc: ['cmc', 'asc'], rarity: ['rarity', 'desc'], price: ['eur', 'desc'], released: ['released', 'desc'] };
+function filterQuery() {
+  const parts = [];
+  const cols = [...ADV.colors], mode = $('fColMode').value;
+  if (cols.length) {
+    const real = cols.filter(c => c !== 'C').join('').toLowerCase();
+    if (mode === 'any') parts.push('(' + cols.map(c => 'c:' + c.toLowerCase()).join(' or ') + ')');
+    else if (mode === 'all') parts.push(real ? 'c:' + real : 'c:c');
+    else if (mode === 'exact') parts.push(real ? 'c=' + real : 'c=c');
+    else parts.push(real ? 'c<=' + real : 'c=c');
+  }
+  const mn = $('fMvMin').value.trim(), mx = $('fMvMax').value.trim();
+  if (mn !== '' && mx !== '' && mn === mx) parts.push('mv=' + mn);
+  else { if (mn !== '') parts.push('mv>=' + mn); if (mx !== '') parts.push('mv<=' + mx); }
+  const t = $('fType').value; if (t) parts.push('t:' + t);
+  if (ADV.rars.size) parts.push('(' + [...ADV.rars].map(r => 'r:' + r).join(' or ') + ')');
+  const set = $('fSet').value.trim().replace(/[^A-Za-z0-9]/g, ''); if (set) parts.push('e:' + set);
+  const tx = $('fText').value.trim().replace(/"/g, ''); if (tx) parts.push('o:"' + tx + '"');
+  return parts.join(' ');
+}
+function updateFilterBadge() {
+  const n = (ADV.colors.size ? 1 : 0) + ($('fMvMin').value !== '' || $('fMvMax').value !== '' ? 1 : 0) + ($('fType').value ? 1 : 0) + (ADV.rars.size ? 1 : 0) + ($('fSet').value.trim() ? 1 : 0) + ($('fText').value.trim() ? 1 : 0) + ($('fOwned').checked ? 1 : 0);
+  $('filtBadge').textContent = n ? ` (${n} attivi)` : '';
+}
+let filtTimer = null;
+function filtersChanged() { updateFilterBadge(); clearTimeout(filtTimer); filtTimer = setTimeout(() => { if ($('q').value.trim() || filterQuery()) doSearch(); }, 450); }
+$('fColors').addEventListener('click', ev => { const ch = ev.target.closest('.chip'); if (!ch) return; const k = ch.dataset.c; ADV.colors.has(k) ? ADV.colors.delete(k) : ADV.colors.add(k); ch.classList.toggle('on'); filtersChanged(); });
+$('fRars').addEventListener('click', ev => { const ch = ev.target.closest('.chip'); if (!ch) return; const k = ch.dataset.r; ADV.rars.has(k) ? ADV.rars.delete(k) : ADV.rars.add(k); ch.classList.toggle('on'); filtersChanged(); });
+['fColMode', 'fMvMin', 'fMvMax', 'fType', 'fOrder', 'fOwned'].forEach(id => { $(id).onchange = filtersChanged; });
+['fSet', 'fText'].forEach(id => { $(id).oninput = filtersChanged; });
+$('fReset').onclick = () => {
+  ADV.colors.clear(); ADV.rars.clear(); document.querySelectorAll('#fColors .chip, #fRars .chip').forEach(c => c.classList.remove('on'));
+  ['fMvMin', 'fMvMax', 'fSet', 'fText'].forEach(id => { $(id).value = ''; }); $('fType').value = ''; $('fColMode').value = 'any'; $('fOwned').checked = false;
+  updateFilterBadge(); if ($('q').value.trim()) doSearch(); else { S.results = []; renderResults(); say('searchMsg', ''); }
+};
+
 async function doSearch() {
   const d = deck(); if (!d) return;
-  const q = $('q').value.trim(); if (!q) return;
+  const q = $('q').value.trim(); const fq = filterQuery();
+  if (!q && !fq) return say('searchMsg', 'Scrivi un nome o scegli almeno un filtro.');
   const seq = ++S.searchSeq;
   say('searchMsg', 'Cerco\u2026'); $('results').innerHTML = '';
   try {
     const cmdr = $('target').value === 'commander' ? (fmtOf(d).scry === 'brawl' ? 'is:brawler' : 'is:commander') : '';
-    const res = await searchCards(q, $('onlyLegal').checked, fmtOf(d).scry, cmdr);
+    const [ord, dir] = ORDERS[$('fOrder').value] || ORDERS.name;
+    let res = await searchCards(q, $('onlyLegal').checked, fmtOf(d).scry, [cmdr, fq].filter(Boolean).join(' '), ord, dir);
+    if ($('fOwned').checked) res = res.filter(c => (S.owned[(c.name || '').toLowerCase()] || 0) > 0);
     if (seq !== S.searchSeq) return;
     S.results = res; S.shown = 60;
     say('searchMsg', res.length ? `${res.length} carte trovate${cmdr ? ' (solo possibili comandanti)' : ''}` : (cmdr ? 'Nessun possibile comandante trovato (solo creature leggendarie e simili).' : 'Nessuna carta trovata. Prova con parole diverse o la sintassi di Scryfall.'));
