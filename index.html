@@ -48,6 +48,8 @@
   th { color:var(--muted); font-weight:600; position:sticky; top:0; background:var(--card); }
   td.num, th.num { text-align:right; white-space:nowrap; }
   .en { color:var(--muted); font-size:12px; }
+  .show-sm { display:none; margin-top:2px; }
+  @media (max-width:560px) { .show-sm { display:block; } }
   .thumb { width:46px; aspect-ratio:488/680; border-radius:4px; background:var(--line); display:block; cursor:zoom-in; object-fit:cover; }
   #zoom { position:fixed; inset:0; background:rgba(0,0,0,.75); z-index:50; display:grid; place-items:center; padding:14px; cursor:zoom-out; }
   #zoom[hidden] { display:none; }
@@ -65,6 +67,7 @@
   nav a.on { background:var(--accent); color:var(--accent-ink); border-color:var(--accent); }
   @media (max-width:520px) { .hide-sm { display:none; } }
 </style>
+<link rel="stylesheet" href="theme.css?v=1">
 </head>
 <body>
 <main>
@@ -155,13 +158,13 @@
     </div>
     <label>Colore (nessuno selezionato = tutti)</label>
     <div id="colors" class="chips">
-      <label class="chip"><input type="checkbox" value="W">Bianco</label>
-      <label class="chip"><input type="checkbox" value="U">Blu</label>
-      <label class="chip"><input type="checkbox" value="B">Nero</label>
-      <label class="chip"><input type="checkbox" value="R">Rosso</label>
-      <label class="chip"><input type="checkbox" value="G">Verde</label>
-      <label class="chip"><input type="checkbox" value="C">Incolore</label>
-      <label class="chip"><input type="checkbox" value="M">Multicolore</label>
+      <label class="chip" title="Bianco" aria-label="Bianco"><input type="checkbox" value="W"><span class="pip pW">W</span></label>
+      <label class="chip" title="Blu" aria-label="Blu"><input type="checkbox" value="U"><span class="pip pU">U</span></label>
+      <label class="chip" title="Nero" aria-label="Nero"><input type="checkbox" value="B"><span class="pip pB">B</span></label>
+      <label class="chip" title="Rosso" aria-label="Rosso"><input type="checkbox" value="R"><span class="pip pR">R</span></label>
+      <label class="chip" title="Verde" aria-label="Verde"><input type="checkbox" value="G"><span class="pip pG">G</span></label>
+      <label class="chip" title="Incolore" aria-label="Incolore"><input type="checkbox" value="C"><span class="pip pC">C</span></label>
+      <label class="chip" title="Multicolore" aria-label="Multicolore"><input type="checkbox" value="M"><span class="pip pM">M</span></label>
     </div>
     <div class="row">
       <div>
@@ -210,6 +213,6 @@
 <script src="config.js?v=2"></script>
 <script src="sync.js?v=1"></script>
 <script src="core.js?v=6"></script>
-<script src="app.js?v=8"></script>
+<script src="app.js?v=10"></script>
 </body>
 </html>

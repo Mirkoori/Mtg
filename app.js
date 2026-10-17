@@ -153,14 +153,19 @@ function colorLabel(c) {
   if (c.startsWith('M:')) return [...c.slice(2)].map(x => COLOR_IT[x] || x).join('/');
   return COLOR_IT[c] || c;
 }
+function colorIcons(c) {
+  if (!c) return '';
+  const ks = c.startsWith('M:') ? [...c.slice(2)] : [c];
+  return ks.map(x => '<span class="pip p' + esc(x) + '" title="' + esc(COLOR_IT[x] || x) + '">' + esc(x) + '</span>').join('');
+}
 function renderPlan() {
   const p = state.plan; $('previewBox').hidden = false;
   $('rows').innerHTML = p.items.map((it, i) => `<tr>
     <td><input type="checkbox" data-i="${i}" checked></td>
     <td><img class="thumb" data-img="${i}" alt="" hidden></td>
-    <td>${esc(it.name_it)}${it.version ? ' <span class="en">(' + esc(it.version) + ')</span>' : ''}${it.name_it !== it.name_en ? '<div class="en">' + esc(it.name_en) + '</div>' : ''}</td>
+    <td>${esc(it.name_it)}${it.version ? ' <span class="en">(' + esc(it.version) + ')</span>' : ''}${it.name_it !== it.name_en ? '<div class="en">' + esc(it.name_en) + '</div>' : ''}<div class="show-sm">${colorIcons(it.color)}</div></td>
     <td class="hide-sm">${esc(it.collector_number || '')}</td>
-    <td class="hide-sm">${esc(colorLabel(it.color))}</td>
+    <td class="hide-sm">${colorIcons(it.color)}</td>
     <td class="hide-sm">${esc(it.condition)} \u00b7 ${esc((it.language || '').toUpperCase())}${it.foil ? ' \u00b7 foil' : ''}</td>
     <td class="num">${it.qty}</td><td class="num">${money(it.price_cents, it.currency)}</td></tr>`).join('');
   $('rows').querySelectorAll('input').forEach(c => c.onchange = updateSummary);

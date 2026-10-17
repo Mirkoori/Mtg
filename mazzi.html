@@ -99,6 +99,7 @@
   #empty { text-align:center; color:var(--muted); padding:30px 10px; }
   @media (max-width:520px) { .barrow { grid-template-columns:96px 1fr 24px 46px; } }
 </style>
+<link rel="stylesheet" href="theme.css?v=1">
 </head>
 <body>
 <main>
@@ -144,9 +145,9 @@
       <summary>Filtri: colore, costo di mana, tipo<span id="filtBadge"></span></summary>
       <div class="msg" style="margin-top:8px">Colore</div>
       <div class="chips" id="fColors">
-        <span class="chip" data-c="W"><span class="pip pW">W</span>Bianco</span><span class="chip" data-c="U"><span class="pip pU">U</span>Blu</span>
-        <span class="chip" data-c="B"><span class="pip pB">B</span>Nero</span><span class="chip" data-c="R"><span class="pip pR">R</span>Rosso</span>
-        <span class="chip" data-c="G"><span class="pip pG">G</span>Verde</span><span class="chip" data-c="C">Incolore</span>
+        <span class="chip" data-c="W" title="Bianco" aria-label="Bianco"><span class="pip pW">W</span></span><span class="chip" data-c="U" title="Blu" aria-label="Blu"><span class="pip pU">U</span></span>
+        <span class="chip" data-c="B" title="Nero" aria-label="Nero"><span class="pip pB">B</span></span><span class="chip" data-c="R" title="Rosso" aria-label="Rosso"><span class="pip pR">R</span></span>
+        <span class="chip" data-c="G" title="Verde" aria-label="Verde"><span class="pip pG">G</span></span><span class="chip" data-c="C" title="Incolore" aria-label="Incolore"><span class="pip pC">C</span></span>
       </div>
       <div class="row"><select id="fColMode" aria-label="Come usare i colori">
         <option value="any">Almeno uno di questi colori</option><option value="all">Tutti questi colori (anche altri)</option>

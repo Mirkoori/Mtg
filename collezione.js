@@ -201,7 +201,7 @@ function buildFilters() {
   $('fType').innerHTML = '<option value="">Tutti i tipi</option>' + TYPES.filter(t => types[t[0]]).map(t => `<option value="${t[0]}">${esc(t[3])} (${types[t[0]]})</option>`).join('');
   $('fSet').innerHTML = '<option value="">Tutte le espansioni</option>' + Object.entries(sets).sort((a, b) => (b[1].rel || '').localeCompare(a[1].rel || '')).map(([k, v]) => `<option value="${esc(k)}">${esc(v.name)} (${esc(k)}) - ${v.n}</option>`).join('');
   $('fRar').innerHTML = '<option value="">Tutte le rarit\u00e0</option>' + RARITIES.filter(r => rars[r[0]]).map(r => `<option value="${r[0]}">${esc(r[1])} (${rars[r[0]]})</option>`).join('');
-  $('colors').innerHTML = COLOR_ORDER.map(k => `<span class="chip" data-c="${k}">${'WUBRG'.includes(k) ? `<span class="pip p${k}">${k}</span>` : ''}${esc(COLOR_IT[k])}</span>`).join('');
+  $('colors').innerHTML = COLOR_ORDER.map(k => `<span class="chip" data-c="${k}" title="${esc(COLOR_IT[k])}" aria-label="${esc(COLOR_IT[k])}"><span class="pip p${k}">${k}</span></span>`).join('');
   $('fType').value = F.type; $('fSet').value = F.set; $('fRar').value = F.rar;
   $('colors').querySelectorAll('.chip').forEach(ch => ch.classList.toggle('on', F.colors.has(ch.dataset.c)));
 }
