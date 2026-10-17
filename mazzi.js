@@ -1,16 +1,12 @@
 'use strict';
 /* Costruttore di mazzi: dati carte da Scryfall, mazzi salvati sul dispositivo (localStorage). */
 const $ = id => document.getElementById(id);
-const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-const sleep = ms => new Promise(r => setTimeout(r, ms));
 const store = {
   get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
   set(k, v) { try { localStorage.setItem(k, v); } catch (e) { toast('Memoria piena: non riesco a salvare'); } },
 };
 const jget = (k, d) => { try { const v = JSON.parse(store.get(k)); return v == null ? d : v; } catch (e) { return d; } };
 
-const SCRY = 'https://api.scryfall.com';
-const LEGAL_KEYS = ['standard', 'pioneer', 'modern', 'legacy', 'vintage', 'pauper', 'commander', 'brawl'];
 const S = {
   decks: jget('mtg_decks', []), cards: jget('mtg_cards', {}), cur: store.get('mtg_cur'),
   view: store.get('mtg_view') || 'grid', owned: jget('mtg_owned', {}),
@@ -24,44 +20,6 @@ const nameOf = c => c.name_it || c.name;
 
 let toastTimer = null;
 function toast(t) { const el = $('toast'); el.textContent = t; el.hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(() => { el.hidden = true; }, 2200); }
-
-// ---------- Scryfall
-let lastReq = 0;
-async function scry(path, body) {
-  const gap = 110 - (Date.now() - lastReq); if (gap > 0) await sleep(gap);
-  lastReq = Date.now();
-  let r;
-  try {
-    r = await fetch(path.startsWith('http') ? path : SCRY + path, body
-      ? { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify(body) }
-      : { headers: { Accept: 'application/json' } });
-  } catch (e) { throw new Error('Connessione a Scryfall non riuscita.'); }
-  if (r.status === 404) return { data: [], not_found: [] };
-  if (!r.ok) throw new Error('Scryfall: errore ' + r.status);
-  return r.json();
-}
-
-function slim(c) {
-  const faces = c.card_faces || [];
-  const f0 = faces[0] || {};
-  const iu = c.image_uris || f0.image_uris || {};
-  const it = c.lang === 'it';
-  const join = k => faces.length ? faces.map(f => f[k] || '').filter(Boolean).join('\n//\n') : (c[k] || '');
-  const pn = it ? (c.printed_name || faces.map(f => f.printed_name || f.name).join(' // ')) : null;
-  const legal = {}; LEGAL_KEYS.forEach(k => { if (c.legalities && c.legalities[k]) legal[k] = c.legalities[k]; });
-  return {
-    id: c.oracle_id || f0.oracle_id || c.id, name: c.name, name_it: pn && pn !== c.name ? pn : null,
-    type: c.type_line || join('type_line'), type_it: it ? (c.printed_type_line || join('printed_type_line') || null) : null,
-    mana: c.mana_cost || faces.map(f => f.mana_cost || '').filter(Boolean).join(' // '), cmc: c.cmc || 0,
-    colors: c.colors || f0.colors || [], ci: c.color_identity || [],
-    text: c.oracle_text || join('oracle_text'), text_it: it ? (c.printed_text || join('printed_text') || null) : null,
-    pt: c.power != null ? c.power + '/' + c.toughness : (f0.power != null ? f0.power + '/' + f0.toughness : (c.loyalty ? 'Lealt\u00e0 ' + c.loyalty : '')),
-    img: iu.small || iu.normal || '', imgBig: iu.normal || iu.small || '',
-    back: faces[1] && faces[1].image_uris ? faces[1].image_uris.normal : '',
-    rarity: c.rarity || '', set: (c.set || '').toUpperCase(), setName: c.set_name || '', eur: parseFloat(c.prices && c.prices.eur) || 0,
-    legal, produced: c.produced_mana || [], lang: c.lang || 'en',
-  };
-}
 
 async function searchPages(q, maxPages) {
   const params = '?' + new URLSearchParams({ q, unique: 'cards', order: 'name' }).toString();
@@ -104,15 +62,6 @@ async function enrichItalian(ids) {
     if (i % 5 === 4) { save(); render(); }
   }
   save(); render(); $('importMsg').textContent = S.importDone || '';
-}
-
-// ---------- mana
-function manaHtml(cost) {
-  return String(cost || '').replace(/\{([^}]+)\}/g, (_, s) => {
-    const k = s.replace('/', '');
-    const col = 'WUBRG'.includes(s) && s.length === 1 ? s : (s === 'C' ? 'C' : (/^\d+$/.test(s) ? 'N' : 'X'));
-    return `<span class="pip p${col}">${esc(s.replace('/', ''))}</span>`;
-  }).replace(/\/\//g, '<span class="sep">//</span>');
 }
 
 // ---------- rendering

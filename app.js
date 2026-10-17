@@ -83,6 +83,16 @@ $('csv').onchange = async ev => {
   say('msgCsv', `Caricate ${state.owned.reduce((a, o) => a + o.qty, 0)} carte (${unique} nomi diversi).`, 'ok');
 };
 
+// collezione gia' caricata dalla pagina Collezione
+(function restoreOwned() {
+  try {
+    const rows = JSON.parse(store.get('mtg_owned_rows') || '[]');
+    if (!rows.length) return;
+    state.owned = rows.map(r => ({ name: r[0], set: r[1], qty: r[2] }));
+    say('msgCsv', 'Uso la collezione salvata dalla pagina Collezione: ' + state.owned.reduce((a, o) => a + o.qty, 0) + ' carte. Puoi caricare un altro file per sostituirla.', 'ok');
+  } catch (e) {}
+})();
+
 // ---- 3. espansione
 function findExpansion() {
   const v = $('exp').value.trim().toLowerCase();
