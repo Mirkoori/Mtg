@@ -56,8 +56,9 @@ function start() {
   G = PL[0]; started = true; HIST = [];
   $('setupMsg').textContent = ''; $('game').hidden = false; $('hand').hidden = false;
   render(); sync();
-  setTimeout(() => { try { $('mat').scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (e) { /* ignora */ } }, 60);
+  $('btnBack').hidden = false; goPlay();
 }
+function goPlay() { document.body.classList.add('playing'); window.scrollTo(0, 0); closeSheet(); render(); }
 function draw(n, quiet) {
   for (let i = 0; i < n; i++) { const c = G.lib.shift(); if (!c) { toast('Grimorio finito'); break; } G.hand.push(c); }
   if (!quiet) say('pesca ' + n);
@@ -93,7 +94,9 @@ function pileImg(el, arr, getImg) {
 }
 function fanHand() {
   const strip = $('handStrip'); const cards = [...strip.children]; const n = cards.length; if (!n) return;
-  const vw = Math.min(window.innerWidth - 24, 1100); const hw = window.innerWidth >= 900 ? 98 : 84;
+  const vw = Math.min(window.innerWidth - 24, 1100); const cwv = parseFloat(getComputedStyle($('mat')).getPropertyValue('--cw')) || 72;
+  const hw = document.body.classList.contains('playing') ? Math.round(Math.min(104, Math.max(64, cwv * 1.15))) : (window.innerWidth >= 900 ? 98 : 84);
+  document.documentElement.style.setProperty('--handh', Math.round(hw * 1.39 * 0.6 + 14) + 'px');
   const step = n > 1 ? Math.min(hw + 6, (vw - hw) / (n - 1)) : 0;
   strip.style.setProperty('--hw', hw + 'px');
   cards.forEach((c, i) => {
@@ -101,6 +104,17 @@ function fanHand() {
     c.style.setProperty('--rot', rot.toFixed(1) + 'deg'); c.style.setProperty('--ty', (Math.abs(m) * Math.abs(m) * 1.1).toFixed(1) + 'px');
     c.style.marginLeft = i ? (step - hw) + 'px' : '0';
   });
+}
+function fitMat() {
+  const mat = $('mat'); if (!document.body.classList.contains('playing')) { mat.style.removeProperty('--cw'); return; }
+  let best = 120;
+  document.querySelectorAll('.half').forEach(hf => {
+    if (hf.offsetParent === null) return; const bd = hf.querySelector('.board'); if (!bd) return;
+    const rows = [...bd.querySelectorAll('.lane-row')].filter(r => r.style.display !== 'none').length || 2;
+    const rowH = (bd.clientHeight - 8 * (rows - 1)) / rows - (window.innerWidth < 900 ? 24 : 24);
+    best = Math.min(best, rowH / 1.42);
+  });
+  mat.style.setProperty('--cw', Math.round(Math.max(38, Math.min(120, best))) + 'px');
 }
 function renderPhases() {
   $('phases').innerHTML = PHASES.map((p, i) => '<button class="ph' + (i === G.phase ? ' on' : '') + '" data-phase="' + i + '">' + p + '</button>').join('');
@@ -110,14 +124,14 @@ function render() {
   const lane = { laneOther: [], laneCreature: [], laneLand: [] };
   G.bf.forEach(c => {
     const d = data(c); const t = c.token ? (c.isCre ? 'c' : 'o') : (Deck.isLand(d) ? 'l' : (/Creature/.test(d.type || '') ? 'c' : 'o'));
-    lane[t === 'l' ? 'laneLand' : t === 'c' ? 'laneCreature' : 'laneOther'].push(c);
+    lane[t === 'l' ? 'laneLand' : 'laneCreature'].push(c);
   });
   Object.keys(lane).forEach(k => { $(k).innerHTML = lane[k].map(c => cardHtml(c, 'bf')).join(''); });
   $('handStrip').innerHTML = G.hand.map(c => cardHtml(c, 'hand')).join('');
   const seen = lastHand && lastHand.who === G ? lastHand.ids : null;
   if (seen) [...$('handStrip').children].forEach((el, i) => { if (!seen.has(G.hand[i].uid)) el.classList.add('deal'); });
   lastHand = { who: G, ids: new Set(G.hand.map(c => c.uid)) };
-  fanHand();
+  fitMat(); fanHand();
   $('handCount').textContent = G.hand.length + (G.hand.length === 1 ? ' carta' : ' carte');
   $('nLib').textContent = G.lib.length; $('nGy').textContent = G.gy.length; $('nEx').textContent = G.ex.length; $('nCmd').textContent = G.cmd.length;
   pileImg($('imgGy'), G.gy, c => data(c).img || ''); pileImg($('imgEx'), G.ex, c => data(c).img || ''); pileImg($('imgCmd'), G.cmd, c => data(c).img || '');
@@ -128,7 +142,7 @@ function render() {
   $('log').innerHTML = G.log.map(esc).join('<br>');
   $('whoBar').hidden = mode !== 'local'; $('whoName').textContent = 'Sta giocando: ' + G.name + (cur ? ' (giocatore 2)' : ' (giocatore 1)');
   $('handTitle').textContent = mode === 'local' ? 'Mano di ' + G.name : 'Mano';
-  renderOpp(); sync();
+  renderOpp(); fitMat(); sync();
 }
 function laneOf(c) { const d = data(c); return c.token ? (c.isCre ? 'c' : 'o') : (Deck.isLand(d) ? 'l' : (/Creature/.test(d.type || '') ? 'c' : 'o')); }
 function pc(c) { const d = data(c); return { u: c.uid, t: c.tapped ? 1 : 0, n: c.cnt, k: laneOf(c), nm: nm(c), i: c.token ? '' : (d.img || ''), ib: c.token ? '' : (d.imgBig || d.img || ''), pt: c.pt || '', ty: d.type_it || d.type || '', tx: String(d.text_it || d.text || '').slice(0, 400) }; }
@@ -140,7 +154,7 @@ function ocard(c, z) {
 function oppData() { return mode === 'online' ? remote : mode === 'local' && PL[1 - cur] ? pub(PL[1 - cur]) : null; }
 function renderOppLocal() {
   const pi = 1 - cur, P = PL[pi]; const lane = { l: [], c: [], o: [] };
-  P.bf.forEach(c => { lane[laneOf(c)].push(c); });
+  P.bf.forEach(c => { lane[laneOf(c) === 'l' ? 'l' : 'c'].push(c); });
   const m = { o: 'oLaneOther', c: 'oLaneCreature', l: 'oLaneLand' };
   Object.keys(m).forEach(k => { $(m[k]).innerHTML = lane[k].map(c => cardHtml(c, 'bf', pi)).join(''); });
   $('oppName').textContent = P.name; $('oLast').textContent = P.log[0] || '';
@@ -163,7 +177,7 @@ function renderOpp() {
   $('oPhase').textContent = o.phase != null ? 'Fase: ' + PHASES[o.phase] : '';
   pileImg($('oGyImg'), o.gy, c => c.i); pileImg($('oExImg'), o.ex, c => c.i); pileImg($('oCmdImg'), o.cmd, c => c.i);
   const m = { o: 'oLaneOther', c: 'oLaneCreature', l: 'oLaneLand' };
-  Object.keys(m).forEach(k => { $(m[k]).innerHTML = o.bf.filter(c => c.k === k).map(c => ocard(c, 'bf')).join(''); });
+  Object.keys(m).forEach(k => { $(m[k]).innerHTML = o.bf.filter(c => (k === 'c' ? c.k !== 'l' : k === 'l' ? c.k === 'l' : false)).map(c => ocard(c, 'bf')).join(''); });
 }
 function oppSheet(c) {
   openSheet('<div class="big">' + (c.ib ? '<img src="' + esc(c.ib) + '" alt="">' : '<div class="noimg" style="width:220px">' + esc(c.nm) + '</div>') + '<div style="flex:1;min-width:200px"><h3 style="margin:0">' + esc(c.nm) + '</h3><div class="msg">' + esc(c.ty) + '</div><div class="otext">' + esc(c.tx).replace(/\n/g, '<br>') + '</div></div></div>');
@@ -300,7 +314,9 @@ $('btnToken').onclick = addToken;
 $('btnProb').onclick = probs;
 $('btnTurn').onclick = nextTurn;
 $('btnUndo').onclick = undo;
-window.addEventListener('resize', () => { if (started) fanHand(); });
+window.addEventListener('resize', () => { if (started) { fitMat(); fanHand(); } });
+$('btnMenu').onclick = () => { document.body.classList.remove('playing'); render(); window.scrollTo(0, 0); };
+$('btnBack').onclick = goPlay;
 document.addEventListener('mouseover', e => {
   const pk = $('peek'); const el = e.target.closest ? e.target.closest('.card[data-u],.card[data-ou]') : null;
   let src = '';
