@@ -15,12 +15,14 @@ function say(t, P) { P = P || G; P.log.unshift('T' + P.turn + ': ' + t); P.log =
 let HIST = [];
 const FIELDS = ['lib', 'hand', 'bf', 'gy', 'ex', 'cmd', 'life', 'pois', 'turn', 'phase', 'uid', 'mulls'];
 function snap() {
-  HIST.push(JSON.stringify(PL.map(p => { const o = {}; FIELDS.forEach(k => { o[k] = p[k]; }); return o; })));
+  HIST.push(JSON.stringify({ cur: cur, p: PL.map(p => { const o = {}; FIELDS.forEach(k => { o[k] = p[k]; }); return o; }) }));
   if (HIST.length > 80) HIST.shift();
 }
 function undo() {
   const s = HIST.pop(); if (!s) { toast('Niente da annullare'); return; }
-  JSON.parse(s).forEach((o, i) => { if (PL[i]) Object.assign(PL[i], o); }); render();
+  const h = JSON.parse(s); h.p.forEach((o, i) => { if (PL[i]) Object.assign(PL[i], o); });
+  if (mode === 'local' && PL[h.cur]) { cur = h.cur; G = PL[cur]; }
+  render();
 }
 function shuffle(a) { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); const t = a[i]; a[i] = a[j]; a[j] = t; } return a; }
 const mk = id => ({ uid: ++G.uid, id: id, tapped: false, cnt: 0 });
@@ -68,7 +70,14 @@ function mulligan() {
   draw(7, true); say('mulligan ' + G.mulls + ' (tieni 7, poi metti ' + G.mulls + ' in fondo)');
   toast('Mulligan: metti in fondo ' + G.mulls + ' carte dal menu della carta'); render();
 }
-function nextTurn() { snap(); G.turn++; G.phase = 3; G.bf.forEach(c => { c.tapped = false; }); draw(1, true); say('nuovo turno, stacca e pesca'); render(); }
+function nextTurn() {
+  snap();
+  if (mode === 'local' && PL.length > 1) { cur = 1 - cur; G = PL[cur]; } // in due su un dispositivo il turno passa all'altro giocatore
+  G.turn++; G.phase = 3; G.bf.forEach(c => { c.tapped = false; }); draw(1, true);
+  say('nuovo turno, stacca e pesca');
+  if (mode === 'local' && PL.length > 1) toast('Tocca a ' + G.name);
+  render();
+}
 
 const pOf = p => (PL[p == null ? cur : p] || G);
 function find(zone, uid, p) { const a = pOf(p)[zone]; const i = a.findIndex(c => c.uid === uid); return { a: a, i: i, c: a[i] }; }
@@ -96,7 +105,7 @@ function fanHand() {
   const strip = $('handStrip'); const cards = [...strip.children]; const n = cards.length; if (!n) return;
   const vw = Math.min(window.innerWidth - 24, 1100); const cwv = parseFloat(getComputedStyle($('mat')).getPropertyValue('--cw')) || 72;
   const hw = document.body.classList.contains('playing') ? Math.round(Math.min(104, Math.max(64, cwv * 1.15))) : (window.innerWidth >= 900 ? 98 : 84);
-  document.documentElement.style.setProperty('--handh', Math.round(hw * 1.39 * 0.6 + 14) + 'px');
+  document.documentElement.style.setProperty('--handh', Math.round(hw * 1.39 * 0.72 + 14) + 'px');
   const step = n > 1 ? Math.min(hw + 6, (vw - hw) / (n - 1)) : 0;
   strip.style.setProperty('--hw', hw + 'px');
   cards.forEach((c, i) => {
