@@ -4,7 +4,7 @@ const $ = id => document.getElementById(id);
 const jget = (k, d) => { try { const v = JSON.parse(localStorage.getItem(k)); return v == null ? d : v; } catch (e) { return d; } };
 const DECKS = jget('mtg_decks', []);
 const CARDS = jget('mtg_cards', {});
-const mkP = d => ({ deck: d, name: d.name, lib: [], hand: [], bf: [], gy: [], ex: [], cmd: [], life: 20, pois: 0, turn: 1, log: [], hist: [], uid: 0, mulls: 0 });
+const mkP = d => ({ deck: d, name: d.name, lib: [], hand: [], bf: [], gy: [], ex: [], cmd: [], life: 20, pois: 0, turn: 1, phase: 3, log: [], hist: [], uid: 0, mulls: 0 });
 let PL = [], cur = 0, G = mkP({ name: '' }), mode = 'solo', remote = null, started = false;
 let peer = null, conn = null, syncT = null;
 const nm = c => (c.token ? c.name : ((CARDS[c.id] && (CARDS[c.id].name_it || CARDS[c.id].name)) || '?'));
@@ -48,6 +48,7 @@ function start() {
   G = PL[0]; started = true;
   $('setupMsg').textContent = ''; $('game').hidden = false; $('hand').hidden = false;
   render(); sync();
+  setTimeout(() => { try { $('mat').scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (e) { /* ignora */ } }, 60);
 }
 function draw(n, quiet) {
   for (let i = 0; i < n; i++) { const c = G.lib.shift(); if (!c) { toast('Grimorio finito'); break; } G.hand.push(c); }
@@ -58,7 +59,7 @@ function mulligan() {
   draw(7, true); say('mulligan ' + G.mulls + ' (tieni 7, poi metti ' + G.mulls + ' in fondo)');
   toast('Mulligan: metti in fondo ' + G.mulls + ' carte dal menu della carta'); render();
 }
-function nextTurn() { snap(); G.turn++; G.bf.forEach(c => { c.tapped = false; }); draw(1, true); say('nuovo turno, stacca e pesca'); render(); }
+function nextTurn() { snap(); G.turn++; G.phase = 3; G.bf.forEach(c => { c.tapped = false; }); draw(1, true); say('nuovo turno, stacca e pesca'); render(); }
 
 function find(zone, uid) { const a = G[zone]; const i = a.findIndex(c => c.uid === uid); return { a: a, i: i, c: a[i] }; }
 function moveTo(zone, uid, dest, where) {
@@ -75,18 +76,45 @@ function cardHtml(c, zone) {
   const img = c.token ? '<div class="noimg">' + esc(c.name) + (c.pt ? '<br>' + esc(c.pt) : '') + '</div>' : (d.img ? '<img loading="lazy" src="' + esc(d.img) + '" alt="' + esc(nm(c)) + '">' : '<div class="noimg">' + esc(nm(c)) + '</div>');
   return '<div class="' + cls + '" data-z="' + zone + '" data-u="' + c.uid + '">' + img + (c.cnt ? '<span class="cb">' + (c.cnt > 0 ? '+' : '') + c.cnt + '</span>' : '') + '</div>';
 }
+const PHASES = ['Stappa', 'Mantenimento', 'Pesca', 'Principale 1', 'Combattimento', 'Principale 2', 'Fine'];
+let lastHand = null;
+function pileImg(el, arr, getImg) {
+  const top = arr[arr.length - 1]; const src = top ? getImg(top) : '';
+  el.innerHTML = src ? '<img loading="lazy" src="' + esc(src) + '" alt="">' : '';
+}
+function fanHand() {
+  const strip = $('handStrip'); const cards = [...strip.children]; const n = cards.length; if (!n) return;
+  const vw = Math.min(window.innerWidth - 24, 1100); const hw = window.innerWidth >= 900 ? 98 : 84;
+  const step = n > 1 ? Math.min(hw + 6, (vw - hw) / (n - 1)) : 0;
+  strip.style.setProperty('--hw', hw + 'px');
+  cards.forEach((c, i) => {
+    const m = i - (n - 1) / 2; const rot = Math.max(-5, Math.min(5, 40 / Math.max(n, 6))) * m * 0.9;
+    c.style.setProperty('--rot', rot.toFixed(1) + 'deg'); c.style.setProperty('--ty', (Math.abs(m) * Math.abs(m) * 1.1).toFixed(1) + 'px');
+    c.style.marginLeft = i ? (step - hw) + 'px' : '0';
+  });
+}
+function renderPhases() {
+  $('phases').innerHTML = PHASES.map((p, i) => '<button class="ph' + (i === G.phase ? ' on' : '') + '" data-phase="' + i + '">' + p + '</button>').join('');
+}
 function render() {
   const lane = { laneOther: [], laneCreature: [], laneLand: [] };
   G.bf.forEach(c => {
     const d = data(c); const t = c.token ? (c.isCre ? 'c' : 'o') : (Deck.isLand(d) ? 'l' : (/Creature/.test(d.type || '') ? 'c' : 'o'));
     lane[t === 'l' ? 'laneLand' : t === 'c' ? 'laneCreature' : 'laneOther'].push(c);
   });
-  Object.keys(lane).forEach(k => { $(k).innerHTML = lane[k].map(c => cardHtml(c, 'bf')).join('') || '<span class="msg">vuoto</span>'; });
+  Object.keys(lane).forEach(k => { $(k).innerHTML = lane[k].map(c => cardHtml(c, 'bf')).join(''); });
   $('handStrip').innerHTML = G.hand.map(c => cardHtml(c, 'hand')).join('');
+  const seen = lastHand && lastHand.who === G ? lastHand.ids : null;
+  if (seen) [...$('handStrip').children].forEach((el, i) => { if (!seen.has(G.hand[i].uid)) el.classList.add('deal'); });
+  lastHand = { who: G, ids: new Set(G.hand.map(c => c.uid)) };
+  fanHand();
   $('handCount').textContent = G.hand.length + (G.hand.length === 1 ? ' carta' : ' carte');
   $('nLib').textContent = G.lib.length; $('nGy').textContent = G.gy.length; $('nEx').textContent = G.ex.length; $('nCmd').textContent = G.cmd.length;
+  pileImg($('imgGy'), G.gy, c => data(c).img || ''); pileImg($('imgEx'), G.ex, c => data(c).img || ''); pileImg($('imgCmd'), G.cmd, c => data(c).img || '');
   $('zCmd').hidden = !G.cmd.length;
   $('turn').textContent = G.turn; $('life').textContent = G.life; $('pois').textContent = G.pois;
+  $('lifeOrb').classList.toggle('low', G.life <= 5);
+  renderPhases();
   $('log').innerHTML = G.log.map(esc).join('<br>');
   $('whoBar').hidden = mode !== 'local'; $('whoName').textContent = 'Sta giocando: ' + G.name + (cur ? ' (giocatore 2)' : ' (giocatore 1)');
   $('handTitle').textContent = mode === 'local' ? 'Mano di ' + G.name : 'Mano';
@@ -94,7 +122,7 @@ function render() {
 }
 function laneOf(c) { const d = data(c); return c.token ? (c.isCre ? 'c' : 'o') : (Deck.isLand(d) ? 'l' : (/Creature/.test(d.type || '') ? 'c' : 'o')); }
 function pc(c) { const d = data(c); return { u: c.uid, t: c.tapped ? 1 : 0, n: c.cnt, k: laneOf(c), nm: nm(c), i: c.token ? '' : (d.img || ''), ib: c.token ? '' : (d.imgBig || d.img || ''), pt: c.pt || '', ty: d.type_it || d.type || '', tx: String(d.text_it || d.text || '').slice(0, 400) }; }
-function pub(p) { return { name: p.name, life: p.life, pois: p.pois, turn: p.turn, nLib: p.lib.length, nHand: p.hand.length, bf: p.bf.map(pc), gy: p.gy.map(pc), ex: p.ex.map(pc), cmd: p.cmd.map(pc), last: p.log[0] || '' }; }
+function pub(p) { return { name: p.name, life: p.life, pois: p.pois, turn: p.turn, nLib: p.lib.length, nHand: p.hand.length, bf: p.bf.map(pc), gy: p.gy.map(pc), ex: p.ex.map(pc), cmd: p.cmd.map(pc), last: p.log[0] || '', phase: p.phase }; }
 function ocard(c, z) {
   const img = c.i ? '<img loading="lazy" src="' + esc(c.i) + '" alt="' + esc(c.nm) + '">' : '<div class="noimg">' + esc(c.nm) + (c.pt ? '<br>' + esc(c.pt) : '') + '</div>';
   return '<div class="card' + (c.t ? ' tapped' : '') + '" data-oz="' + z + '" data-ou="' + c.u + '">' + img + (c.n ? '<span class="cb">' + (c.n > 0 ? '+' : '') + c.n + '</span>' : '') + '</div>';
@@ -104,12 +132,14 @@ function renderOpp() {
   const o = oppData(); const box = $('oppBox');
   if (mode === 'solo' || (!o && mode !== 'online')) { box.hidden = true; return; }
   box.hidden = false;
-  if (!o) { $('oppName').textContent = 'In attesa dell\'avversario...'; ['oLaneOther', 'oLaneCreature', 'oLaneLand'].forEach(k => { $(k).innerHTML = ''; }); return; }
+  if (!o) { $('oppName').textContent = 'In attesa dell\'avversario...'; $('oLast').textContent = ''; ['oLaneOther', 'oLaneCreature', 'oLaneLand'].forEach(k => { $(k).innerHTML = ''; }); return; }
   $('oppName').textContent = o.name || 'Avversario'; $('oLife').textContent = o.life; $('oPois').textContent = o.pois; $('oTurn').textContent = o.turn;
   $('oGy').textContent = o.gy.length; $('oEx').textContent = o.ex.length; $('oCmd').textContent = o.cmd.length; $('oCmdB').hidden = !o.cmd.length;
   $('oHand').textContent = o.nHand; $('oLib').textContent = o.nLib; $('oLast').textContent = o.last || '';
+  $('oPhase').textContent = o.phase != null ? 'Fase: ' + PHASES[o.phase] : '';
+  pileImg($('oGyImg'), o.gy, c => c.i); pileImg($('oExImg'), o.ex, c => c.i); pileImg($('oCmdImg'), o.cmd, c => c.i);
   const m = { o: 'oLaneOther', c: 'oLaneCreature', l: 'oLaneLand' };
-  Object.keys(m).forEach(k => { $(m[k]).innerHTML = o.bf.filter(c => c.k === k).map(c => ocard(c, 'bf')).join('') || '<span class="msg">vuoto</span>'; });
+  Object.keys(m).forEach(k => { $(m[k]).innerHTML = o.bf.filter(c => c.k === k).map(c => ocard(c, 'bf')).join(''); });
 }
 function oppSheet(c) {
   openSheet('<div class="big">' + (c.ib ? '<img src="' + esc(c.ib) + '" alt="">' : '<div class="noimg" style="width:220px">' + esc(c.nm) + '</div>') + '<div style="flex:1;min-width:200px"><h3 style="margin:0">' + esc(c.nm) + '</h3><div class="msg">' + esc(c.ty) + '</div><div class="otext">' + esc(c.tx).replace(/\n/g, '<br>') + '</div></div></div>');
@@ -219,6 +249,7 @@ document.addEventListener('click', e => {
     if (z === 'bf' && !$('sheet').hidden) { cardMenu(z, uid); return; }
     cardMenu(z, uid); return;
   }
+  const ph = t.closest('[data-phase]'); if (ph) { G.phase = +ph.dataset.phase; say('fase: ' + PHASES[G.phase]); render(); return; }
   const oc = t.closest('[data-ou]');
   if (oc) { const o = oppData(); const z = oc.dataset.oz; const c = o && (o[z] || []).find(x => x.u === +oc.dataset.ou); if (c) oppSheet(c); return; }
   const oz = t.closest('[data-ozone]'); if (oz) { oppZone(oz.dataset.ozone); return; }
@@ -239,6 +270,14 @@ $('btnToken').onclick = addToken;
 $('btnProb').onclick = probs;
 $('btnTurn').onclick = nextTurn;
 $('btnUndo').onclick = undo;
+window.addEventListener('resize', () => { if (started) fanHand(); });
+document.addEventListener('mouseover', e => {
+  const pk = $('peek'); const el = e.target.closest ? e.target.closest('.card[data-u],.card[data-ou]') : null;
+  let src = '';
+  if (el && el.dataset.u) { const f = find(el.dataset.z, +el.dataset.u); if (f.c && !f.c.token) { const d = data(f.c); src = d.imgBig || d.img || ''; } }
+  else if (el && el.dataset.ou) { const o = oppData(); const c = o && (o[el.dataset.oz] || []).find(x => x.u === +el.dataset.ou); if (c) src = c.ib || c.i || ''; }
+  if (src) { pk.firstChild.src = src; pk.hidden = false; } else pk.hidden = true;
+});
 $('modeSel').onchange = () => { const m = $('modeSel').value; $('deck2Box').hidden = m !== 'local'; $('onlineBox').hidden = m !== 'online'; };
 $('btnHost').onclick = hostRoom; $('btnJoin').onclick = joinRoom;
 $('btnSwap').onclick = () => { cur = 1 - cur; G = PL[cur]; render(); window.scrollTo(0, 0); toast('Ora gioca ' + G.name); };

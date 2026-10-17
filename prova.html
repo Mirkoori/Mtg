@@ -68,6 +68,77 @@
   .pip { display:inline-grid; place-items:center; min-width:17px; height:17px; border-radius:50%; font-size:10px; font-weight:700; margin:0 1px; padding:0 3px; color:#222; vertical-align:middle; }
   .pW { background:#f6f1d0; } .pU { background:#a9d4ee; } .pB { background:#b9afa8; } .pR { background:#f4a58a; } .pG { background:#9bd3ae; } .pC, .pN, .pX { background:#d6d3cc; }
   .sep { margin:0 4px; color:var(--muted); }
+
+  /* ---- Tappeto di gioco ---- */
+  main { max-width:1200px; padding-bottom:240px; }
+  .mat { --cw:72px; position:relative; border-radius:22px; padding:10px; border:7px solid #4a331f; color:#eef3ee;
+    background:radial-gradient(ellipse at 50% 45%,#34795c 0%,#215644 52%,#133628 100%);
+    box-shadow:inset 0 0 90px rgba(0,0,0,.55),0 12px 34px rgba(0,0,0,.35); overflow:hidden; }
+  .mat::before { content:""; position:absolute; inset:0; pointer-events:none; opacity:.10; mix-blend-mode:overlay;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E"); }
+  .mat > * { position:relative; }
+  @media (min-width:900px) { .mat { --cw:92px; padding:14px; } }
+  .half { display:grid; grid-template-columns:1fr; gap:8px; }
+  @media (min-width:900px) { .half { grid-template-columns:170px 1fr; gap:12px; } }
+  .half.opp { background:linear-gradient(rgba(0,0,0,.22),transparent); border-radius:14px; padding:8px; }
+  .side { display:flex; flex-wrap:wrap; gap:10px; align-items:center; }
+  @media (min-width:900px) { .side { flex-direction:column; align-items:flex-start; flex-wrap:nowrap; } .nameplate { flex:none; } }
+  .nameplate { flex:1 1 100%; display:flex; flex-direction:column; }
+  .nameplate b { font-size:16px; letter-spacing:.02em; } .nameplate .last { font-size:12px; opacity:.7; min-height:16px; }
+  .piles { display:flex; gap:8px; flex-wrap:wrap; }
+  .pile { position:relative; width:calc(var(--cw)*.82); padding:0; background:none; border:none; color:#fff; text-align:center; font-weight:400; }
+  .pile .pl { display:block; font-size:10.5px; letter-spacing:.07em; text-transform:uppercase; opacity:.75; margin-bottom:2px; }
+  .pile b { position:absolute; right:-5px; bottom:-5px; min-width:22px; height:22px; padding:0 5px; border-radius:11px; display:grid; place-items:center;
+    background:#d9a441; color:#2a1c05; font-size:12px; box-shadow:0 2px 6px rgba(0,0,0,.4); }
+  .pimg { display:block; aspect-ratio:488/680; border-radius:6px; border:1.5px dashed rgba(255,255,255,.35); background:rgba(0,0,0,.18); overflow:hidden; }
+  .pimg img { width:100%; height:100%; object-fit:cover; display:block; }
+  button.pile:hover .pimg { border-color:#d9a441; }
+  .pimg.back { border:2px solid #d9c27a; position:relative; background:radial-gradient(circle at 50% 40%,#3a2563,#1c1030 70%); box-shadow:0 3px 0 -1px #120a22,0 6px 0 -2px #261640,0 9px 10px rgba(0,0,0,.4); }
+  .pimg.back::after { content:""; position:absolute; left:50%; top:50%; width:62%; aspect-ratio:1; transform:translate(-50%,-50%); border-radius:50%;
+    background:radial-gradient(circle,#1c1030 0 34%,transparent 35%),conic-gradient(#e6dfb4 0 20%,#4a8fc7 0 40%,#3a3330 0 60%,#d9543a 0 80%,#3f9a62 0); box-shadow:0 0 0 2px #d9c27a; }
+  .orb { width:82px; height:82px; border-radius:50%; display:grid; place-content:center; text-align:center; color:#fff;
+    background:radial-gradient(circle at 35% 28%,#ff9d8a,#b3261e 58%,#5a0f0b); box-shadow:inset 0 -6px 12px rgba(0,0,0,.35),0 6px 14px rgba(0,0,0,.4),0 0 0 3px #d9c27a; }
+  .orb b { font-size:32px; line-height:1; } .orb small { font-size:10px; letter-spacing:.1em; text-transform:uppercase; opacity:.85; }
+  .orb.low { animation:pulse 1s ease-in-out infinite; }
+  @keyframes pulse { 50% { box-shadow:inset 0 -6px 12px rgba(0,0,0,.35),0 0 0 3px #ff6b5a,0 0 22px #ff3b2a; } }
+  .lifebtns { display:flex; gap:4px; }
+  .lifebtns button, .mini button { padding:0; width:30px; height:28px; border-radius:8px; background:rgba(255,255,255,.14); border:1px solid rgba(255,255,255,.3); color:#fff; font-size:13px; }
+  .mini { display:flex; gap:10px; flex-wrap:wrap; font-size:12.5px; opacity:.95; align-items:center; }
+  .mini b { font-size:14px; } .mini button { width:24px; height:24px; border-radius:50%; }
+  .board { display:flex; flex-direction:column; gap:8px; min-width:0; }
+  .lane-row { position:relative; display:flex; flex-wrap:wrap; gap:8px; align-items:flex-start; padding:20px 8px 8px; border-radius:12px;
+    min-height:calc(var(--cw)*1.0 + 36px); background:rgba(0,0,0,.14); box-shadow:inset 0 0 0 1px rgba(255,255,255,.07); }
+  .lane-row::before { content:attr(data-l); position:absolute; left:10px; top:4px; font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:rgba(255,255,255,.4); }
+  .lane-row .msg { display:none; }
+  .mat .card { width:var(--cw); transition:transform .18s, box-shadow .18s; }
+  .mat .card img { border-radius:6px; box-shadow:0 3px 8px rgba(0,0,0,.45); }
+  .mat .card:hover { z-index:3; }
+  .mat .card:not(.tapped):hover { transform:translateY(-4px); }
+  .mat .card.tapped { transform:rotate(90deg); margin:0 calc(var(--cw)*.28); }
+  .mat .noimg { color:#222; }
+  .mid { margin:10px 0; padding:8px 4px; border-top:1px solid rgba(217,164,65,.55); border-bottom:1px solid rgba(217,164,65,.55);
+    display:flex; flex-direction:column; gap:8px; align-items:center; }
+  .phases { display:flex; gap:4px; flex-wrap:wrap; justify-content:center; }
+  .ph { padding:3px 10px; border-radius:999px; font-size:12px; border:1px solid rgba(255,255,255,.28); background:rgba(0,0,0,.22); color:#e8efe9; cursor:pointer; font-weight:500; }
+  .ph.on { background:#d9a441; color:#2a1c05; border-color:#d9a441; font-weight:700; }
+  .acts2 { display:flex; gap:6px; flex-wrap:wrap; justify-content:center; align-items:center; }
+  .turnbox { font-size:13px; opacity:.9; } .turnbox b { font-size:18px; }
+  .mat button.small { background:rgba(255,255,255,.12); color:#fff; border:1px solid rgba(255,255,255,.3); }
+  .mat button.small.pri { background:#d9a441; color:#2a1c05; border-color:#d9a441; font-weight:700; }
+  .mat button.small:hover { background:rgba(255,255,255,.22); } .mat button.small.pri:hover { background:#e6b455; }
+  /* mano a ventaglio */
+  #hand { position:fixed; left:0; right:0; bottom:0; z-index:10; background:linear-gradient(transparent,rgba(8,20,15,.94) 55%); padding:34px 8px calc(6px + env(safe-area-inset-bottom,0px)); pointer-events:none; border:none; }
+  #handStrip { display:flex; justify-content:center; align-items:flex-end; pointer-events:auto; padding-top:44px; padding-bottom:0; gap:0; overflow:visible; }
+  #handStrip .card { width:var(--hw,84px); flex:none; transform:rotate(var(--rot,0deg)) translateY(var(--ty,0)); transform-origin:50% 120%; transition:transform .16s; }
+  #handStrip .card img { box-shadow:0 4px 10px rgba(0,0,0,.55); }
+  #handStrip .card:hover { transform:translateY(-38px) scale(1.18); z-index:20; }
+  #handStrip .card.deal { animation:deal .5s cubic-bezier(.2,.8,.3,1) backwards; }
+  @keyframes deal { from { transform:translate(-30vw,-38vh) scale(.5) rotate(-25deg); opacity:0; } }
+  .handlabel { text-align:center; font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:rgba(255,255,255,.7); pointer-events:none; margin-top:2px; }
+  /* anteprima ingrandita al passaggio del mouse */
+  #peek { position:fixed; right:16px; top:78px; width:250px; z-index:15; pointer-events:none; display:none; }
+  #peek img { width:100%; border-radius:13px; box-shadow:0 12px 34px rgba(0,0,0,.55); }
+  @media (hover:hover) and (min-width:900px) { #peek:not([hidden]) { display:block; } }
 </style>
 <link rel="stylesheet" href="theme.css?v=1">
 </head>
@@ -104,56 +175,75 @@
   </section>
 
   <div id="game" hidden>
-    <div class="panel" id="oppBox" hidden>
-      <div class="bar" style="margin-bottom:6px"><b id="oppName">Avversario</b>
-        <span class="stat">Vita <b id="oLife">20</b></span><span class="stat">Veleno <b id="oPois">0</b></span>
-        <span class="stat">Turno <b id="oTurn">1</b></span>
-        <button class="small secondary" data-ozone="gy">Cimitero <span id="oGy">0</span></button>
-        <button class="small secondary" data-ozone="ex">Esilio <span id="oEx">0</span></button>
-        <button class="small secondary" data-ozone="cmd" id="oCmdB">Comando <span id="oCmd">0</span></button>
-        <span class="msg">Mano <b id="oHand">0</b> &middot; Grimorio <b id="oLib">0</b></span>
-      </div>
-      <div class="field" style="margin-bottom:6px"><h3>Permanenti</h3><div class="lane" id="oLaneOther"></div></div>
-      <div class="field" style="margin-bottom:6px"><h3>Creature</h3><div class="lane" id="oLaneCreature"></div></div>
-      <div class="field" style="margin-bottom:0"><h3>Terre</h3><div class="lane" id="oLaneLand"></div></div>
-      <div class="msg" id="oLast"></div>
-    </div>
     <div class="bar" id="whoBar" hidden style="margin-bottom:10px"><b id="whoName"></b><button class="small" id="btnSwap">Passa all'altro giocatore</button></div>
-    <div class="panel bar" id="topbar">
-      <span class="stat">Turno <b id="turn">1</b><button id="btnTurn" style="width:auto;padding:0 8px;border-radius:12px;background:var(--accent);color:var(--accent-ink)">Prossimo</button></span>
-      <span class="stat">Vita <button data-life="-5">-5</button><button data-life="-1">-</button><b id="life">20</b><button data-life="1">+</button><button data-life="5">+5</button></span>
-      <span class="stat">Veleno <button data-pois="-1">-</button><b id="pois">0</b><button data-pois="1">+</button></span>
-      <button class="secondary small" id="btnUndo">Annulla</button>
+    <div class="mat" id="mat">
+      <section class="half opp" id="oppBox" hidden>
+        <div class="side">
+          <div class="nameplate"><b id="oppName">Avversario</b><span id="oLast" class="last"></span></div>
+          <div class="piles">
+            <div class="pile"><span class="pl">Grimorio</span><span class="pimg back"></span><b id="oLib">0</b></div>
+            <button class="pile" data-ozone="gy"><span class="pl">Cimitero</span><span class="pimg" id="oGyImg"></span><b id="oGy">0</b></button>
+            <button class="pile" data-ozone="ex"><span class="pl">Esilio</span><span class="pimg" id="oExImg"></span><b id="oEx">0</b></button>
+            <button class="pile" data-ozone="cmd" id="oCmdB"><span class="pl">Comando</span><span class="pimg" id="oCmdImg"></span><b id="oCmd">0</b></button>
+          </div>
+          <div class="orb"><b id="oLife">20</b><small>vita</small></div>
+          <div class="mini"><span>Veleno <b id="oPois">0</b></span><span>Mano <b id="oHand">0</b></span><span>Turno <b id="oTurn">1</b></span><span id="oPhase"></span></div>
+        </div>
+        <div class="board">
+          <div class="lane-row" data-l="Terre" id="oLaneLand"></div>
+          <div class="lane-row" data-l="Creature" id="oLaneCreature"></div>
+          <div class="lane-row" data-l="Permanenti" id="oLaneOther"></div>
+        </div>
+      </section>
+
+      <div class="mid">
+        <div class="phases" id="phases"></div>
+        <div class="acts2">
+          <span class="turnbox">Turno <b id="turn">1</b></span>
+          <button class="small pri" id="btnTurn">Prossimo turno</button>
+          <button class="small" id="btnDraw">Pesca</button>
+          <button class="small" id="btnScry">Guarda le prime N</button>
+          <button class="small" id="btnShuffle">Rimescola</button>
+          <button class="small" id="btnMull">Mulligan</button>
+          <button class="small" id="btnToken">Gettone</button>
+          <button class="small" id="btnProb">Probabilit&#224;</button>
+          <button class="small" id="btnUndo">Annulla</button>
+        </div>
+      </div>
+
+      <section class="half me">
+        <div class="side">
+          <div class="orb me" id="lifeOrb"><b id="life">20</b><small>vita</small></div>
+          <div class="lifebtns">
+            <button data-life="-5">-5</button><button data-life="-1">-1</button><button data-life="1">+1</button><button data-life="5">+5</button>
+          </div>
+          <div class="mini"><span>Veleno <button data-pois="-1">-</button><b id="pois">0</b><button data-pois="1">+</button></span></div>
+          <div class="piles">
+            <button class="pile" data-zone="library"><span class="pl">Grimorio</span><span class="pimg back"></span><b id="nLib">0</b></button>
+            <button class="pile" data-zone="graveyard"><span class="pl">Cimitero</span><span class="pimg" id="imgGy"></span><b id="nGy">0</b></button>
+            <button class="pile" data-zone="exile"><span class="pl">Esilio</span><span class="pimg" id="imgEx"></span><b id="nEx">0</b></button>
+            <button class="pile" data-zone="command" id="zCmd"><span class="pl">Comando</span><span class="pimg" id="imgCmd"></span><b id="nCmd">0</b></button>
+          </div>
+        </div>
+        <div class="board">
+          <div class="lane-row" data-l="Permanenti" id="laneOther"></div>
+          <div class="lane-row" data-l="Creature" id="laneCreature"></div>
+          <div class="lane-row" data-l="Terre" id="laneLand"></div>
+        </div>
+      </section>
     </div>
-    <div id="banner" class="banner" hidden></div>
-    <div class="zones" style="margin-bottom:10px">
-      <button class="zonebtn" data-zone="library"><span>Grimorio</span><b id="nLib">0</b></button>
-      <button class="zonebtn" data-zone="graveyard"><span>Cimitero</span><b id="nGy">0</b></button>
-      <button class="zonebtn" data-zone="exile"><span>Esilio</span><b id="nEx">0</b></button>
-      <button class="zonebtn" data-zone="command" id="zCmd"><span>Comando</span><b id="nCmd">0</b></button>
-    </div>
-    <div class="row" style="margin:0 0 10px">
-      <button class="small" id="btnDraw">Pesca</button>
-      <button class="small secondary" id="btnScry">Guarda le prime N</button>
-      <button class="small secondary" id="btnShuffle">Rimescola</button>
-      <button class="small secondary" id="btnMull">Mulligan</button>
-      <button class="small secondary" id="btnToken">Gettone</button>
-      <button class="small secondary" id="btnProb">Probabilit&#224;</button>
-    </div>
-    <div class="field"><h3>Permanenti</h3><div class="lane" id="laneOther"></div></div>
-    <div class="field"><h3>Creature</h3><div class="lane" id="laneCreature"></div></div>
-    <div class="field"><h3>Terre</h3><div class="lane" id="laneLand"></div></div>
-    <details class="panel"><summary>Cronaca</summary><div id="log"></div></details>
+    <details class="panel" style="margin-top:12px"><summary>Cronaca</summary><div id="log"></div></details>
   </div>
 </main>
 
-<div id="hand" hidden><h3><span id="handTitle">Mano</span><span id="handCount"></span></h3><div id="handStrip"></div></div>
+<div id="hand" hidden><div id="handStrip"></div><div class="handlabel"><span id="handTitle">Mano</span> &middot; <span id="handCount"></span></div></div>
+<div id="peek" hidden><img alt=""></div>
 <div id="sheet" hidden><div id="sBox"><button id="sClose" aria-label="Chiudi">&times;</button><div id="sBody"></div></div></div>
 <div id="toast" hidden></div>
 <script src="config.js?v=2"></script>
 <script src="sync.js?v=3"></script>
 <script src="deckcore.js?v=8"></script>
 <script src="scry.js?v=8"></script>
-<script src="prova.js?v=9"></script>
+<script src="prova.js?v=10"></script>
 </body>
 </html>
