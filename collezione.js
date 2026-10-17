@@ -169,6 +169,7 @@ async function loadText(text) {
     store.set('mtg_owned', JSON.stringify(om));
   } catch (e) {}
   await idb.set('entries', entries);
+  store.set('mtg_entries', JSON.stringify(entries));
   const prog = $('prog'); prog.hidden = false;
   const unknown = entries.filter(e => !C.cards[e.key]).length;
   say('loadMsg', unknown ? 'Scarico le immagini e i dati delle carte\u2026' : 'Preparo la collezione\u2026');
@@ -323,14 +324,19 @@ $('btnClear').onclick = async () => {
   if (!confirm('Rimuovere la collezione salvata su questo dispositivo? Il file CSV resta dov\u2019\u00e8.')) return;
   C.entries = []; C.cards = {}; C.notFound = [];
   await idb.set('entries', []); await idb.set('cards', {});
-  store.set('mtg_owned_rows', '[]'); store.set('mtg_owned', '{}');
+  store.set('mtg_owned_rows', '[]'); store.set('mtg_owned', '{}'); store.set('mtg_entries', '[]');
   $('app').hidden = true; $('empty').hidden = false; $('loadTools').hidden = true; $('missBox').hidden = true; say('loadMsg', 'Collezione rimossa.');
 };
 
 // ---------- avvio: ripristina la collezione salvata
 (async () => {
-  const [entries, cards, it, itSets] = await Promise.all([idb.get('entries'), idb.get('cards'), idb.get('it'), idb.get('itsets')]);
+  let [entries, cards, it, itSets] = await Promise.all([idb.get('entries'), idb.get('cards'), idb.get('it'), idb.get('itsets')]);
   C.cards = cards || {}; C.it = it || {}; C.itSets = itSets || [];
+  // La collezione completa viaggia con l'account (mtg_entries): se e diversa da quella locale, vince quella dell'account.
+  let saved = null; try { saved = JSON.parse(store.get('mtg_entries')); } catch (e) { saved = null; }
+  if (Array.isArray(saved)) {
+    if (JSON.stringify(saved) !== JSON.stringify(entries || [])) { entries = saved; await idb.set('entries', entries); }
+  } else if (entries && entries.length) { store.set('mtg_entries', JSON.stringify(entries)); }
   if (entries && entries.length) {
     C.entries = entries;
     C.notFound = entries.filter(e => !C.cards[e.key]);

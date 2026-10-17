@@ -2,7 +2,7 @@
 /* Account e salvataggio online (Supabase). Senza config.js compilato non fa nulla.
    Sincronizza solo mazzi, carte dei mazzi e collezione. Il token Cardtrader NON viene mai inviato. */
 (function () {
-  const KEYS = ['mtg_decks', 'mtg_cards', 'mtg_cur', 'mtg_owned', 'mtg_owned_rows'];
+  const KEYS = ['mtg_decks', 'mtg_cards', 'mtg_cur', 'mtg_owned', 'mtg_owned_rows', 'mtg_entries'];
   const cfg = window.MTG_CFG || {};
   const LS = window.localStorage;
   const rawSet = Storage.prototype.setItem, rawRem = Storage.prototype.removeItem;
@@ -17,7 +17,7 @@
   Storage.prototype.setItem = function (k, v) { rawSet.call(this, k, v); if (this === LS && KEYS.indexOf(k) >= 0) markDirty(); };
   Storage.prototype.removeItem = function (k) { rawRem.call(this, k); if (this === LS && KEYS.indexOf(k) >= 0) markDirty(); };
 
-  const isEmptyLocal = () => { const d = lget('mtg_decks'); return (!d || d === '[]') && !lget('mtg_owned_rows'); };
+  const isEmptyLocal = () => { const d = lget('mtg_decks'); return (!d || d === '[]') && !lget('mtg_owned_rows') && !lget('mtg_entries'); };
   const hhmm = () => new Date().toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
 
   async function push() {
