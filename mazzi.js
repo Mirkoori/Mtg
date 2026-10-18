@@ -288,7 +288,10 @@ function stratPool(d) {
 }
 function coachHtml(co) {
   let h = '<div class="coach"><div class="steps">' + co.steps.map((x, i) => `<span class="stp ${x.done ? 'done' : ''} ${x.cur ? 'cur' : ''}">${x.done ? '\u2713' : i + 1} ${esc(x.name)}</span>`).join('') + '</div>';
-  h += `<div class="ctitle">Passo ${co.idx + 1} di ${co.steps.length}: ${esc(co.title)}</div><div class="msg">${esc(co.text)}</div>`;
+  h += `<div class="ctitle">Passo ${co.idx + 1} di ${co.steps.length}: ${esc(co.title)}</div>`;
+  if (co.id === 'tema' && co.quote) h += `<div class="cquote">${esc(co.quote.length > 260 ? co.quote.slice(0, 260) + '\u2026' : co.quote).replace(/\n/g, '<br>')}</div>`;
+  h += `<div class="msg">${esc(co.text)}</div>`;
+  if (co.progress) h += `<div class="prog"><span class="bt"><span class="bf ${co.progress.n >= co.progress.of ? 'ok' : 'warn'}" style="width:${Math.min(100, co.progress.n / co.progress.of * 100)}%"></span></span><small>${co.progress.n}/${co.progress.of}</small></div>`;
   if (co.id === 'tema' && co.themes.length > 1) h += '<div class="thm">' + co.themes.map(t => `<span class="chip ${co.chosen && co.chosen.id === t.id ? 'on' : ''}" data-act="stpick" data-t="${esc(t.id)}" title="${esc(t.desc)}">${esc(t.name)}</span>`).join('') + '</div>';
   const acts = [];
   if (co.basics) acts.push('<button data-act="stbasics">Completa con terre base</button>');
@@ -328,48 +331,51 @@ function renderStrategy(d) {
   h += coachHtml(co);
   const akey = d.id + ':' + (co.search ? co.search.id : co.id);
   if (co.search && st.open && st.autoKey !== akey) { st.autoKey = akey; st.sel = co.search; setTimeout(stratSearch, 0); }
+  let an = '';
   if (a.nSpell >= 10) {
-    h += `<div class="arch">Stile di gioco: <b>${esc(a.archetype.name)}</b> <span class="msg">(costo medio ${a.avg.toFixed(1)})</span><div class="msg">${esc(a.archetype.text)}</div></div>`;
+    an += `<div class="arch">Stile di gioco: <b>${esc(a.archetype.name)}</b> <span class="msg">(costo medio ${a.avg.toFixed(1)})</span><div class="msg">${esc(a.archetype.text)}</div></div>`;
     const top = a.tribes.concat(a.themes.filter(x => x.n >= 3).slice(0, 5));
     if (top.length) {
-      h += '<div class="stsub">Meccaniche che gi\u00e0 emergono dal mazzo</div><div class="thm">' +
+      an += '<div class="stsub">Meccaniche che gi\u00e0 emergono dal mazzo</div><div class="thm">' +
         top.map(x => `<span class="chip" data-act="sttheme" data-t="${esc(x.theme.id)}" title="${esc(x.theme.desc)}">${esc(x.theme.name)} <small>${x.n}</small></span>`).join('') + '</div>';
-      h += '<div class="msg" style="margin-top:4px">Tocca una meccanica per vedere altre carte che la rafforzano. I numeri sono le copie nel mazzo che la usano.</div>';
+      an += '<div class="msg" style="margin-top:4px">Tocca una meccanica per vedere altre carte che la rafforzano. I numeri sono le copie nel mazzo che la usano.</div>';
       const best = a.themes[0];
-      if (best && best.n >= 3) h += `<details style="margin-top:6px"><summary>Quali carte fanno \u00ab${esc(best.theme.name)}\u00bb</summary><div class="stcards">${esc([...new Set(best.cards.map(nameOf))].join(', '))}</div></details>`;
+      if (best && best.n >= 3) an += `<details style="margin-top:6px"><summary>Quali carte fanno \u00ab${esc(best.theme.name)}\u00bb</summary><div class="stcards">${esc([...new Set(best.cards.map(nameOf))].join(', '))}</div></details>`;
     } else {
-      h += '<div class="msg" style="margin-top:8px">Per ora le carte non puntano a una meccanica precisa. Sceglierne una (qui sotto) rende il mazzo pi\u00f9 coerente: pi\u00f9 carte che si aiutano tra loro, meno carte "sole".</div>';
+      an += '<div class="msg" style="margin-top:8px">Per ora le carte non puntano a una meccanica precisa. Sceglierne una (qui sotto) rende il mazzo pi\u00f9 coerente: pi\u00f9 carte che si aiutano tra loro, meno carte "sole".</div>';
     }
     if (a.landAdvice && Math.abs(a.landAdvice.diff) >= 2) {
       const l = a.landAdvice;
-      h += `<div class="gap">\u26a0 Terre: ne hai ${l.have}, per questa curva ne servirebbero circa ${l.ideal} (${l.diff > 0 ? 'qualcuna in meno' : 'qualcuna in pi\u00f9'}).</div>`;
+      an += `<div class="gap">\u26a0 Terre: ne hai ${l.have}, per questa curva ne servirebbero circa ${l.ideal} (${l.diff > 0 ? 'qualcuna in meno' : 'qualcuna in pi\u00f9'}).</div>`;
     }
     if (a.gaps.length) {
-      h += '<div class="stsub">Cosa manca</div>' + a.gaps.map(g => {
+      an += '<div class="stsub">Cosa manca</div>' + a.gaps.map(g => {
         const r = Strategy.ROLES[g.role];
         return `<div class="gap"><span>${esc(r.name)}: ne hai ${g.have}, meglio averne ${g.want}.</span><button data-act="strole" data-r="${g.role}">Suggerisci</button></div>`;
       }).join('');
     }
-    if (fmtOf(d).commander === false && !a.gaps.length && a.landAdvice && Math.abs(a.landAdvice.diff) < 2) h += '<div class="gap">\u2713 Le proporzioni tra terre, rampa, pesca e rimozioni sembrano a posto.</div>';
+    if (fmtOf(d).commander === false && !a.gaps.length && a.landAdvice && Math.abs(a.landAdvice.diff) < 2) an += '<div class="gap">\u2713 Le proporzioni tra terre, rampa, pesca e rimozioni sembrano a posto.</div>';
   }
-  h += '<div class="stsub">Cerca carte per strategia</div><div class="thm">' +
+  let pk = '<details id="stPick" ' + (st.pickOpen || !co.search ? 'open' : '') + ' style="margin-top:12px"><summary>Cerca per un\'altra strategia, colori o tipo</summary><div class="thm" style="margin-top:6px">' +
     pool.map(t => `<span class="chip ${st.sel && st.sel.id === t.id ? 'on' : ''}" data-act="sttheme" data-t="${esc(t.id)}" title="${esc(t.desc)}">${esc(t.name)}</span>`).join('') + '</div>';
-  h += '<div class="thm" style="margin-top:8px">' + Object.values(Strategy.ROLES).map(r => `<span class="chip ${st.sel && st.sel.id === r.id ? 'on' : ''}" data-act="strole" data-r="${esc(r.id.split(':')[1])}">${esc(r.name)}</span>`).join('') + '</div>';
-  h += '<div class="row"><span class="msg">Colori:</span><span class="chips">' + ['W', 'U', 'B', 'R', 'G'].map(c => `<span class="chip ${st.colors.has(c) ? 'on' : ''}" data-act="stcol" data-c="${c}"><span class="pip p${c}">${c}</span></span>`).join('') + '</span>' +
+  pk += '<div class="thm" style="margin-top:8px">' + Object.values(Strategy.ROLES).map(r => `<span class="chip ${st.sel && st.sel.id === r.id ? 'on' : ''}" data-act="strole" data-r="${esc(r.id.split(':')[1])}">${esc(r.name)}</span>`).join('') + '</div>';
+  pk += '<div class="row"><span class="msg">Colori:</span><span class="chips">' + ['W', 'U', 'B', 'R', 'G'].map(c => `<span class="chip ${st.colors.has(c) ? 'on' : ''}" data-act="stcol" data-c="${c}"><span class="pip p${c}">${c}</span></span>`).join('') + '</span>' +
     `<select id="stType" aria-label="Tipo"><option value="">Tutti i tipi</option>${[['creature', 'Creature'], ['instant', 'Istantanei'], ['sorcery', 'Stregonerie'], ['artifact', 'Artefatti'], ['enchantment', 'Incantesimi'], ['planeswalker', 'Planeswalker']].map(([v, l]) => `<option value="${v}" ${st.type === v ? 'selected' : ''}>${l}</option>`).join('')}</select>` +
     `<label class="chk"><input type="checkbox" id="stOwned" ${st.onlyOwned ? 'checked' : ''}> Solo carte che ho</label></div>`;
-  h += '<div class="msg" style="margin-top:6px">' + esc(st.msg) + '</div>';
+  pk += '</details>';
+  let rs = '<div class="msg" style="margin-top:8px">' + esc(st.msg) + '</div>';
   const inDeck = new Set(d.cards.map(e => S.cards[e.id] && S.cards[e.id].name).filter(Boolean));
   const view = st.results.map((c, i) => ({ c, i })).filter(x => !inDeck.has(x.c.name));
   const shown = view.slice(0, st.shown);
   if (shown.length) {
-    h += '<div class="rgrid">' + shown.map(({ c, i }) => {
+    rs += '<div class="rgrid">' + shown.map(({ c, i }) => {
       const own = ownedQty(c);
       return `<div class="rtile"><a data-act="stopen" data-i="${i}">${c.img ? `<img loading="lazy" src="${esc(c.img)}" alt="${esc(nameOf(c))}">` : `<div class="noimg">${esc(nameOf(c))}</div>`}</a>
         <div class="rn">${esc(nameOf(c))}<div>${manaHtml(c.mana)}</div></div>${Object.keys(S.owned).length ? `<div class="why">${own ? 'Ce l\'hai (' + own + ')' : ''}</div>` : ''}<button data-act="stadd" data-i="${i}">+ Aggiungi</button></div>`;
     }).join('') + '</div>';
-    if (view.length > st.shown) h += `<div class="row"><button class="secondary" data-act="stmore">Mostra altre (${view.length - st.shown})</button></div>`;
+    if (view.length > st.shown) rs += `<div class="row"><button class="secondary" data-act="stmore">Mostra altre (${view.length - st.shown})</button></div>`;
   }
+  h += rs + an + pk;
   h += '</details>';
   el.innerHTML = h;
 }
@@ -531,7 +537,7 @@ for (const [k, f] of Object.entries(Deck.FORMATS)) $('newFmt').insertAdjacentHTM
 if (!S.cur || !deck()) S.cur = S.decks.length ? S.decks[0].id : '';
 render();
 
-document.addEventListener('toggle', ev => { if (ev.target && ev.target.id === 'stratDet') { S.strat.open = ev.target.open; store.set('mtg_strat_open', ev.target.open ? '1' : '0'); } }, true);
+document.addEventListener('toggle', ev => { if (ev.target && ev.target.id === 'stPick') S.strat.pickOpen = ev.target.open; if (ev.target && ev.target.id === 'stratDet') { S.strat.open = ev.target.open; store.set('mtg_strat_open', ev.target.open ? '1' : '0'); } }, true);
 document.addEventListener('change', ev => {
   if (ev.target.id === 'stType') { S.strat.type = ev.target.value; if (S.strat.sel) stratSearch(); }
   else if (ev.target.id === 'stOwned') { S.strat.onlyOwned = ev.target.checked; if (S.strat.sel) stratSearch(); }

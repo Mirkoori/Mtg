@@ -156,10 +156,12 @@ const Strategy = (() => {
           if (!/^[A-Z][a-z]+$/.test(w) || w === 'Human' || seen.has('tribe:' + w)) return;
           seen.add('tribe:' + w);
           // se il testo del comandante parla del suo tipo (es. "Elves you control") il tema tribale viene per primo
-          (new RegExp('\\b' + w.toLowerCase().replace(/f$/, '(f|ve)') + '(s|es)?\\b', 'i').test(txt) ? first : tribe).push(tribeTheme(w));
+          const inText = new RegExp('\\b' + w.toLowerCase().replace(/f$/, '(f|ve)') + '(s|es)?\\b', 'i').test(txt);
+          const th = Object.assign({}, tribeTheme(w), { why: inText ? '\u00e8 un ' + Deck.typeIt(w.toLowerCase()) + ' e il suo testo parla del suo tipo' : '\u00e8 un ' + Deck.typeIt(w.toLowerCase()) });
+          (inText ? first : tribe).push(th);
         });
       });
-      THEMES.forEach(th => { if (!seen.has(th.id) && th.re.test(txt)) { seen.add(th.id); mech.push(th); } });
+      THEMES.forEach(th => { const m = !seen.has(th.id) && th.re.exec(txt); if (m) { seen.add(th.id); mech.push(Object.assign({}, th, { why: 'nel testo: \u00ab' + m[0].trim().slice(0, 40) + '\u00bb' })); } });
     });
     return first.concat(mech, tribe).slice(0, 5);
   }
@@ -189,8 +191,9 @@ const Strategy = (() => {
     else if (!skip.terre && lands < ideal - 1) id = 'terre';
     else id = 'fine';
     const idx = steps.findIndex(x => x.id === id);
+    const quote = cmds.map(c => c.text_it || c.text).filter(Boolean).join(' // ');
     steps.forEach((x, i) => { x.done = i < idx; x.cur = i === idx; });
-    const r = { id, idx, steps, themes, chosen, syn, synTarget, nl, spellTarget, lands, ideal, cmds, gaps, search: null, title: '', text: '', canSkip: id !== 'fine' };
+    const r = { id, idx, steps, themes, chosen, syn, synTarget, nl, spellTarget, lands, ideal, cmds, gaps, quote, search: null, title: '', text: '', canSkip: id !== 'fine' };
     const cmdName = cmds.map(c => c.name_it || c.name).join(' e ');
     if (id === 'cmd') {
       r.title = 'Scegli il comandante';
@@ -199,13 +202,14 @@ const Strategy = (() => {
     } else if (id === 'tema') {
       r.title = isC ? 'Costruisci attorno a ' + cmdName : 'Scegli la strategia';
       if (chosen) {
-        r.text = (isC ? cmdName + ' punta su: ' : 'Il mazzo sta andando verso: ') + themes.map(t => t.name).join(', ') + '. Segui \u00ab' + chosen.name + '\u00bb: ' + chosen.desc + ' Prendi circa ' + synTarget + ' carte che lavorano con questo tema (ne hai ' + syn + '). Puoi cambiare tema toccando un\'altra scelta.';
+        r.text = (isC ? cmdName + ' ti porta verso ' : 'Il mazzo sta andando verso ') + '\u00ab' + chosen.name + '\u00bb' + (chosen.why ? ' (' + chosen.why + ')' : '') + '. ' + chosen.desc + ' Scegli circa ' + synTarget + ' carte che lavorano con questo tema' + (themes.length > 1 ? '; se preferisci un\'altra strada toccane un\'altra qui sotto.' : '.');
+        r.progress = { n: syn, of: synTarget };
         r.search = { id: 'coach:tema:' + chosen.id, name: chosen.name, q: chosen.q, theme: chosen };
       } else r.text = (isC ? 'Non riconosco una meccanica precisa nel testo del comandante. ' : '') + 'Scegli tu una meccanica o un tipo di creatura dall\'elenco qui sotto: ti propongo le carte pi\u00f9 usate nei tuoi colori.';
     } else if (id === 'base') {
       const g = gaps[0];
-      r.title = 'Metti le fondamenta';
-      r.text = 'Un mazzo solido ha rampa (per giocare le carte prima), pesca (per non restare senza carte) e rimozioni (per rispondere all\'avversario). Mancano: ' + gaps.map(x => Strategy_roleName(x.role) + ' (' + x.have + '/' + x.want + ')').join(', ') + '. Parto da: ' + Strategy_roleName(g.role) + '.';
+      r.title = 'Metti le fondamenta'; r.progress = null;
+      r.text = 'Un mazzo solido ha rampa (per giocare le carte prima), pesca (per non restare senza carte) e rimozioni (per rispondere all\'avversario). Mancano: ' + gaps.map(x => Strategy_roleName(x.role) + (x.have ? ' (ne hai ' + x.have + ', ne servono ' + x.want + ')' : ' (ne servono circa ' + x.want + ')')).join(', ') + '. Parto da: ' + Strategy_roleName(g.role) + '.';
       r.search = Object.assign({}, ROLES[g.role], { id: 'coach:base:' + g.role, role: g.role });
     } else if (id === 'fill') {
       r.title = 'Completa il mazzo';
@@ -213,7 +217,7 @@ const Strategy = (() => {
       r.search = chosen ? { id: 'coach:fill:' + chosen.id, name: chosen.name, q: chosen.q, theme: chosen } : null;
     } else if (id === 'terre') {
       r.title = 'Sistema le terre';
-      r.text = 'Per questo mazzo servono circa ' + ideal + ' terre, ne hai ' + lands + '. Prima aggiungi le terre speciali che producono pi\u00f9 colori (sotto), poi completa con le terre base in proporzione ai simboli di mana.';
+      r.text = 'Per questo mazzo servono circa ' + ideal + ' terre' + (lands ? ', ne hai ' + lands : '') + '. Prima aggiungi le terre speciali che producono pi\u00f9 colori (sotto), poi completa con le terre base in proporzione ai simboli di mana.';
       r.search = { id: 'coach:terre', name: 'Terre utili', q: 't:land -t:basic', type: 'land', land: true };
       r.basics = true;
     } else {
