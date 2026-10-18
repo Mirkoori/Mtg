@@ -13,6 +13,7 @@ const S = {
   results: [], searchSeq: 0, shown: 60, target: 'auto', modalId: null,
 };
 
+S.strat = { open: store.get('mtg_strat_open') !== '0', deckId: null, colors: new Set(), sel: null, type: '', onlyOwned: false, results: [], shown: 24, msg: '', seq: 0 };
 function save() { store.set('mtg_decks', JSON.stringify(S.decks)); store.set('mtg_cards', JSON.stringify(S.cards)); store.set('mtg_cur', S.cur || ''); }
 const deck = () => S.decks.find(d => d.id === S.cur) || null;
 const fmtOf = d => Deck.FORMATS[d.format] || Deck.FORMATS.pioneer;
@@ -80,6 +81,7 @@ function render() {
   $('empty').hidden = !!d; $('deckArea').hidden = !d;
   if (!d) return;
   renderSummary(d);
+  renderStrategy(d);
   renderSections(d);
   renderTargetSelect(d);
 }
@@ -269,6 +271,108 @@ async function importList(text, replace) {
 }
 function say(id, t) { $(id).textContent = t; }
 
+
+// ---------- strategia e consigli
+function deckColors(d) {
+  const set = new Set();
+  const cm = d.cards.filter(e => e.section === 'commander');
+  (cm.length ? cm : d.cards.filter(e => e.section !== 'side')).forEach(e => { const c = S.cards[e.id]; if (c) (c.ci || []).forEach(x => set.add(x)); });
+  return set;
+}
+function stratPool(d) {
+  const a = Strategy.analyze(d, S.cards);
+  const pool = [];
+  a.tribes.forEach(t => pool.push(t.theme));
+  Strategy.THEMES.forEach(t => pool.push(t));
+  return { a, pool };
+}
+function renderStrategy(d) {
+  const st = S.strat, el = $('stratBox');
+  if (st.deckId !== d.id) { st.deckId = d.id; st.colors = deckColors(d); st.sel = null; st.results = []; st.msg = ''; st.shown = 24; }
+  const { a, pool } = stratPool(d);
+  let h = `<details id="stratDet" ${st.open ? 'open' : ''}><summary>Strategia e consigli</summary>`;
+  if (a.nSpell < 10) {
+    h += '<div class="msg" style="margin-top:8px">Non sai da dove partire? Scegli qui sotto una meccanica che ti piace (o un tipo di creatura) e ti propongo carte adatte al formato e ai colori. Man mano che il mazzo cresce, qui vedrai anche che stile sta prendendo e cosa manca.</div>';
+  } else {
+    h += `<div class="arch">Stile di gioco: <b>${esc(a.archetype.name)}</b> <span class="msg">(costo medio ${a.avg.toFixed(1)})</span><div class="msg">${esc(a.archetype.text)}</div></div>`;
+    const top = a.tribes.concat(a.themes.filter(x => x.n >= 3).slice(0, 5));
+    if (top.length) {
+      h += '<div class="stsub">Meccaniche che gi\u00e0 emergono dal mazzo</div><div class="thm">' +
+        top.map(x => `<span class="chip" data-act="sttheme" data-t="${esc(x.theme.id)}" title="${esc(x.theme.desc)}">${esc(x.theme.name)} <small>${x.n}</small></span>`).join('') + '</div>';
+      h += '<div class="msg" style="margin-top:4px">Tocca una meccanica per vedere altre carte che la rafforzano. I numeri sono le copie nel mazzo che la usano.</div>';
+      const best = a.themes[0];
+      if (best && best.n >= 3) h += `<details style="margin-top:6px"><summary>Quali carte fanno \u00ab${esc(best.theme.name)}\u00bb</summary><div class="stcards">${esc([...new Set(best.cards.map(nameOf))].join(', '))}</div></details>`;
+    } else {
+      h += '<div class="msg" style="margin-top:8px">Per ora le carte non puntano a una meccanica precisa. Sceglierne una (qui sotto) rende il mazzo pi\u00f9 coerente: pi\u00f9 carte che si aiutano tra loro, meno carte "sole".</div>';
+    }
+    if (a.landAdvice && Math.abs(a.landAdvice.diff) >= 2) {
+      const l = a.landAdvice;
+      h += `<div class="gap">\u26a0 Terre: ne hai ${l.have}, per questa curva ne servirebbero circa ${l.ideal} (${l.diff > 0 ? 'qualcuna in meno' : 'qualcuna in pi\u00f9'}).</div>`;
+    }
+    if (a.gaps.length) {
+      h += '<div class="stsub">Cosa manca</div>' + a.gaps.map(g => {
+        const r = Strategy.ROLES[g.role];
+        return `<div class="gap"><span>${esc(r.name)}: ne hai ${g.have}, meglio averne ${g.want}.</span><button data-act="strole" data-r="${g.role}">Suggerisci</button></div>`;
+      }).join('');
+    }
+    if (fmtOf(d).commander === false && !a.gaps.length && a.landAdvice && Math.abs(a.landAdvice.diff) < 2) h += '<div class="gap">\u2713 Le proporzioni tra terre, rampa, pesca e rimozioni sembrano a posto.</div>';
+  }
+  h += '<div class="stsub">Cerca carte per strategia</div><div class="thm">' +
+    pool.map(t => `<span class="chip ${st.sel && st.sel.id === t.id ? 'on' : ''}" data-act="sttheme" data-t="${esc(t.id)}" title="${esc(t.desc)}">${esc(t.name)}</span>`).join('') + '</div>';
+  h += '<div class="thm" style="margin-top:8px">' + Object.values(Strategy.ROLES).map(r => `<span class="chip ${st.sel && st.sel.id === r.id ? 'on' : ''}" data-act="strole" data-r="${esc(r.id.split(':')[1])}">${esc(r.name)}</span>`).join('') + '</div>';
+  h += '<div class="row"><span class="msg">Colori:</span><span class="chips">' + ['W', 'U', 'B', 'R', 'G'].map(c => `<span class="chip ${st.colors.has(c) ? 'on' : ''}" data-act="stcol" data-c="${c}"><span class="pip p${c}">${c}</span></span>`).join('') + '</span>' +
+    `<select id="stType" aria-label="Tipo"><option value="">Tutti i tipi</option>${[['creature', 'Creature'], ['instant', 'Istantanei'], ['sorcery', 'Stregonerie'], ['artifact', 'Artefatti'], ['enchantment', 'Incantesimi'], ['planeswalker', 'Planeswalker']].map(([v, l]) => `<option value="${v}" ${st.type === v ? 'selected' : ''}>${l}</option>`).join('')}</select>` +
+    `<label class="chk"><input type="checkbox" id="stOwned" ${st.onlyOwned ? 'checked' : ''}> Solo carte che ho</label></div>`;
+  h += '<div class="msg" style="margin-top:6px">' + esc(st.msg) + '</div>';
+  const inDeck = new Set(d.cards.map(e => S.cards[e.id] && S.cards[e.id].name).filter(Boolean));
+  const view = st.results.map((c, i) => ({ c, i })).filter(x => !inDeck.has(x.c.name));
+  const shown = view.slice(0, st.shown);
+  if (shown.length) {
+    h += '<div class="rgrid">' + shown.map(({ c, i }) => {
+      const own = ownedQty(c);
+      return `<div class="rtile"><a data-act="stopen" data-i="${i}">${c.img ? `<img loading="lazy" src="${esc(c.img)}" alt="${esc(nameOf(c))}">` : `<div class="noimg">${esc(nameOf(c))}</div>`}</a>
+        <div class="rn">${esc(nameOf(c))}<div>${manaHtml(c.mana)}</div></div>${Object.keys(S.owned).length ? `<div class="why">${own ? 'Ce l\'hai (' + own + ')' : ''}</div>` : ''}<button data-act="stadd" data-i="${i}">+ Aggiungi</button></div>`;
+    }).join('') + '</div>';
+    if (view.length > st.shown) h += `<div class="row"><button class="secondary" data-act="stmore">Mostra altre (${view.length - st.shown})</button></div>`;
+  }
+  h += '</details>';
+  el.innerHTML = h;
+}
+async function stratItalian(list) {
+  const todo = list.filter(c => !c.name_it && !c.itTried);
+  for (let i = 0; i < todo.length; i += 15) {
+    const chunk = todo.slice(i, i + 15); chunk.forEach(c => { c.itTried = true; });
+    try {
+      const q = '(' + chunk.map(c => `!"${c.name.split(' // ')[0].replace(/["\\]/g, '')}"`).join(' or ') + ') lang:it';
+      const r = await scry('/cards/search?' + new URLSearchParams({ q, unique: 'cards' }).toString());
+      (r.data || []).forEach(x => {
+        const s = slim(x); const c = chunk.find(k => k.name.split(' // ')[0].toLowerCase() === (x.name || '').split(' // ')[0].toLowerCase());
+        if (c && s.name_it) Object.assign(c, { name_it: s.name_it, type_it: s.type_it, text_it: s.text_it, img: s.img || c.img, imgBig: s.imgBig || c.imgBig });
+      });
+    } catch (e) { /* restano i nomi inglesi */ }
+  }
+}
+async function stratSearch() {
+  const st = S.strat, d = deck(); if (!d || !st.sel) return;
+  const seq = ++st.seq, f = fmtOf(d);
+  st.msg = `Cerco carte per \u00ab${st.sel.name}\u00bb\u2026`; st.results = []; st.shown = 24; renderStrategy(d);
+  const cols = [...st.colors].join('').toLowerCase();
+  let q = st.sel.q + ' game:paper' + (f.scry ? ' f:' + f.scry : '') + (cols ? ' id<=' + cols : '');
+  q += st.type ? ' t:' + st.type : ' -t:land';
+  try {
+    const data = await searchPages(q, 3, 'edhrec');
+    if (seq !== st.seq) return;
+    const seen = new Set(); let res = [];
+    data.forEach(x => { const s = slim(x); if (!seen.has(s.id)) { seen.add(s.id); res.push(s); } });
+    if (st.onlyOwned) res = res.filter(c => ownedQty(c) > 0);
+    else if (Object.keys(S.owned).length) res = res.slice(0, 120); // l'ordine per popolarita' resta
+    st.results = res;
+    st.msg = res.length ? `${res.length} carte trovate, dalle pi\u00f9 usate.${f.scry ? ' Solo legali in ' + f.name + '.' : ''}` : 'Nessuna carta trovata con questi colori e filtri. Prova ad aggiungere un colore o togliere il tipo.';
+    renderStrategy(d);
+    await stratItalian(res.slice(0, st.shown)); if (seq === st.seq) renderStrategy(d);
+  } catch (e) { if (seq === st.seq) { st.msg = e.message; renderStrategy(d); } }
+}
+
 // ---------- eventi
 document.addEventListener('click', ev => {
   const t = ev.target.closest('[data-act]'); if (!t) return;
@@ -282,6 +386,16 @@ document.addEventListener('click', ev => {
     ev.preventDefault(); const was = S.target; S.target = t.dataset.sec; renderTargetSelect(d); openSearch();
     if ($('q').value.trim() && (was === 'commander' || S.target === 'commander')) doSearch();
   } else if (act === 'ropen') { const c = S.results[+t.dataset.i]; S.cards[c.id] = Object.assign(S.cards[c.id] || {}, c); openModal(c.id, null); }
+  else if (act === 'sttheme' || act === 'strole') {
+    const st = S.strat; const pool = stratPool(d).pool;
+    st.sel = act === 'strole' ? Strategy.ROLES[t.dataset.r] : pool.find(x => x.id === t.dataset.t);
+    if (st.sel) stratSearch();
+  } else if (act === 'stcol') {
+    const st = S.strat, c = t.dataset.c; st.colors.has(c) ? st.colors.delete(c) : st.colors.add(c);
+    if (st.sel) stratSearch(); else renderStrategy(d);
+  } else if (act === 'stopen') { const c = S.strat.results[+t.dataset.i]; if (c) { S.cards[c.id] = Object.assign(S.cards[c.id] || {}, c); openModal(c.id, null); } }
+  else if (act === 'stadd') { const c = S.strat.results[+t.dataset.i]; if (c) addToDeck(c, 'auto'); }
+  else if (act === 'stmore') { const st = S.strat; st.shown += 24; renderStrategy(d); stratItalian(st.results.slice(0, st.shown)).then(() => renderStrategy(d)); }
   else if (act === 'radd') { addToDeck(S.results[+t.dataset.i], $('target').value); }
 });
 $('modal').addEventListener('click', ev => { if (ev.target === $('modal') || ev.target.id === 'mClose') closeModal(); });
@@ -375,3 +489,9 @@ $('doImport').onclick = () => importList($('importText').value, $('importReplace
 for (const [k, f] of Object.entries(Deck.FORMATS)) $('newFmt').insertAdjacentHTML('beforeend', `<option value="${k}" ${k === 'pioneer' ? 'selected' : ''}>${esc(f.name)}</option>`);
 if (!S.cur || !deck()) S.cur = S.decks.length ? S.decks[0].id : '';
 render();
+
+document.addEventListener('toggle', ev => { if (ev.target && ev.target.id === 'stratDet') { S.strat.open = ev.target.open; store.set('mtg_strat_open', ev.target.open ? '1' : '0'); } }, true);
+document.addEventListener('change', ev => {
+  if (ev.target.id === 'stType') { S.strat.type = ev.target.value; if (S.strat.sel) stratSearch(); }
+  else if (ev.target.id === 'stOwned') { S.strat.onlyOwned = ev.target.checked; if (S.strat.sel) stratSearch(); }
+});

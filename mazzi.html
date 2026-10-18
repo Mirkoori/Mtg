@@ -55,6 +55,16 @@
   .cn { font-size:11px; color:var(--muted); } .cl { position:absolute; bottom:0; font-size:11px; color:var(--muted); }
   .pipsrow { margin-top:8px; font-size:13px; color:var(--muted); }
   .warns { margin:10px 0 0; padding-left:18px; font-size:13px; } .warns li.warn { color:var(--warn); } .warns li.info { color:var(--muted); } .warns li.ok { color:var(--ok); }
+  /* strategia */
+  #stratBox > details > summary { font-weight:700; font-size:16px; }
+  .arch { margin:10px 0 4px; } .arch b { font-size:16px; }
+  .thm { display:flex; flex-wrap:wrap; gap:6px; margin-top:6px; }
+  .chip small { opacity:.75; margin-left:2px; }
+  .gap { display:flex; gap:8px; align-items:center; flex-wrap:wrap; font-size:13.5px; margin:6px 0; }
+  .gap button { padding:3px 10px; font-size:13px; }
+  .stsub { font-weight:700; font-size:14px; margin:14px 0 2px; }
+  .stcards { font-size:12.5px; color:var(--muted); margin:4px 0 0; }
+  .rtile .why { font-size:11px; color:var(--muted); margin-bottom:3px; }
   /* mana */
   .pip { display:inline-grid; place-items:center; min-width:17px; height:17px; border-radius:50%; font-size:10px; font-weight:700; margin:0 1px; padding:0 3px; color:#222; vertical-align:middle; }
   .pW { background:#f6f1d0; } .pU { background:#a9d4ee; } .pB { background:#b9afa8; } .pR { background:#f4a58a; } .pG { background:#9bd3ae; } .pC, .pN, .pX { background:#d6d3cc; }
@@ -184,6 +194,7 @@
 
   <div id="deckArea" hidden>
     <section id="summary"></section>
+    <section id="stratBox"></section>
     <div id="sections"></div>
   </div>
 </main>
@@ -192,8 +203,9 @@
 <div id="toast" hidden></div>
 <script src="config.js?v=2"></script>
 <script src="sync.js?v=3"></script>
-<script src="deckcore.js?v=7"></script>
+<script src="deckcore.js?v=8"></script>
+<script src="strategy.js?v=1"></script>
 <script src="scry.js?v=7"></script>
-<script src="mazzi.js?v=7"></script>
+<script src="mazzi.js?v=8"></script>
 </body>
 </html>

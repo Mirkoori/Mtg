@@ -233,6 +233,8 @@ const Deck = (() => {
     return out;
   }
 
-  return { typeWordsEn, SECTIONS, MAIN, FORMATS, classify, emptyDeck, entries, count, mainCount, addCard, setQty, moveCard, stats, check, exportText, parseList, colorPips, isLand, isBasic };
+  const TYPE_EN_IT = {}; Object.entries(TYPE_IT).forEach(([it, en]) => { if (!(en in TYPE_EN_IT)) TYPE_EN_IT[en] = it; });
+  function typeIt(en) { const k = TYPE_EN_IT[String(en || '').toLowerCase()]; return k ? k.charAt(0).toUpperCase() + k.slice(1) : en; }
+  return { typeIt, typeWordsEn, SECTIONS, MAIN, FORMATS, classify, emptyDeck, entries, count, mainCount, addCard, setQty, moveCard, stats, check, exportText, parseList, colorPips, isLand, isBasic };
 })();
 if (typeof module !== 'undefined') module.exports = Deck;
