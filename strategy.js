@@ -87,7 +87,7 @@ const Strategy = (() => {
   }
   function tribeTheme(sub) {
     const w = sub.toLowerCase();
-    return { id: 'tribe:' + sub, name: 'Tribale: ' + Deck.typeIt(w), desc: 'Creature dello stesso tipo (' + sub + ') che si potenziano a vicenda.', q: `(t:${w} or o:${w})`, tribe: true };
+    return { id: 'tribe:' + sub, name: 'Tribale: ' + Deck.typeIt(w), desc: 'Creature dello stesso tipo (' + sub + ') che si potenziano a vicenda.', q: `(t:${w} or o:${w})`, tribe: true, sub: sub };
   }
 
   function analyze(deck, cards) {
@@ -138,6 +138,92 @@ const Strategy = (() => {
     return out;
   }
 
-  return { THEMES, ROLES, ARCH, analyze, tribeTheme };
+
+  // la carta c appartiene al tema? (tribale: tipo o testo; altrimenti testo)
+  function matches(theme, c) {
+    if (theme.tribe) { const w = theme.sub.toLowerCase(); return lc(c.type).toLowerCase().includes(w) || lc(c.text).toLowerCase().includes(w) || /changeling/i.test(lc(c.text)); }
+    return theme.re.test(lc(c.text));
+  }
+  // temi suggeriti dal comandante: meccaniche del suo testo e tipo di creatura
+  function cmdThemes(cmds) {
+    const first = [], mech = [], tribe = [], seen = new Set();
+    cmds.forEach(c => {
+      const txt = lc(c.text);
+      faceTypes(c).forEach(t => {
+        if (!/\bCreature\b/.test(t)) return;
+        const sub = t.split(/—|-/)[1]; if (!sub) return;
+        sub.trim().split(/\s+/).forEach(w => {
+          if (!/^[A-Z][a-z]+$/.test(w) || w === 'Human' || seen.has('tribe:' + w)) return;
+          seen.add('tribe:' + w);
+          // se il testo del comandante parla del suo tipo (es. "Elves you control") il tema tribale viene per primo
+          (new RegExp('\\b' + w.toLowerCase().replace(/f$/, '(f|ve)') + '(s|es)?\\b', 'i').test(txt) ? first : tribe).push(tribeTheme(w));
+        });
+      });
+      THEMES.forEach(th => { if (!seen.has(th.id) && th.re.test(txt)) { seen.add(th.id); mech.push(th); } });
+    });
+    return first.concat(mech, tribe).slice(0, 5);
+  }
+
+  // Guida a passi: dice a che punto sei e cosa fare adesso.
+  function coach(deck, cards, a) {
+    const fmt = a.fmt, isC = !!fmt.commander, pref = deck.strat || {}, skip = pref.skip || {};
+    const cmds = deck.cards.filter(e => e.section === 'commander').map(e => cards[e.id]).filter(Boolean);
+    const body = deck.cards.filter(e => e.section !== 'commander' && e.section !== 'side' && cards[e.id]).map(e => ({ c: cards[e.id], qty: e.qty }));
+    const sum = arr => arr.reduce((x, y) => x + y.qty, 0);
+    const nl = sum(body.filter(x => !Deck.isLand(x.c)));
+    const lands = sum(body.filter(x => Deck.isLand(x.c)));
+    const spellTarget = fmt.size - (isC ? fmt.targets.lands[1] : fmt.targets.lands[1]) - (isC ? 0 : 0);
+    const themes = isC ? cmdThemes(cmds) : a.tribes.map(t => t.theme).concat(a.themes.filter(x => x.n >= 3).slice(0, 4).map(x => x.theme));
+    const chosen = themes.find(t => t.id === pref.theme) || (pref.theme ? (a.tribes.map(t => t.theme).concat(THEMES).find(t => t.id === pref.theme)) : null) || themes[0] || null;
+    const syn = chosen ? sum(body.filter(x => !Deck.isLand(x.c) && matches(chosen, x.c))) : 0;
+    const synTarget = isC ? 10 : 8;
+    const ideal = a.landAdvice ? a.landAdvice.ideal : fmt.targets.lands[1];
+    const gaps = a.gaps.filter(g => g.have < fmt.targets[g.role][0] && !skip['base:' + g.role]);
+    const steps = (isC ? [{ id: 'cmd', name: 'Comandante' }] : []).concat([
+      { id: 'tema', name: 'Tema' }, { id: 'base', name: 'Fondamenta' }, { id: 'fill', name: 'Completa' }, { id: 'terre', name: 'Terre' }, { id: 'fine', name: 'Rifinitura' }]);
+    let id;
+    if (isC && !cmds.length && !skip.cmd) id = 'cmd';
+    else if (!skip.tema && (!chosen ? nl < 8 : (syn < synTarget && nl < spellTarget * 0.5))) id = 'tema';
+    else if (gaps.length && !skip.base) id = 'base';
+    else if (!skip.fill && nl < spellTarget - 2) id = 'fill';
+    else if (!skip.terre && lands < ideal - 1) id = 'terre';
+    else id = 'fine';
+    const idx = steps.findIndex(x => x.id === id);
+    steps.forEach((x, i) => { x.done = i < idx; x.cur = i === idx; });
+    const r = { id, idx, steps, themes, chosen, syn, synTarget, nl, spellTarget, lands, ideal, cmds, gaps, search: null, title: '', text: '', canSkip: id !== 'fine' };
+    const cmdName = cmds.map(c => c.name_it || c.name).join(' e ');
+    if (id === 'cmd') {
+      r.title = 'Scegli il comandante';
+      r.text = 'Il comandante decide colori e stile del mazzo, quindi si parte da qui. Ti mostro i pi\u00f9 usati: filtra per colore o per meccanica qui sotto e tocca \u00ab+ Aggiungi\u00bb sul tuo preferito.';
+      r.search = { id: 'coach:cmd', name: 'Possibili comandanti', q: fmt.scry === 'brawl' ? 'is:brawler' : 'is:commander', section: 'commander', cmdSearch: true };
+    } else if (id === 'tema') {
+      r.title = isC ? 'Costruisci attorno a ' + cmdName : 'Scegli la strategia';
+      if (chosen) {
+        r.text = (isC ? cmdName + ' punta su: ' : 'Il mazzo sta andando verso: ') + themes.map(t => t.name).join(', ') + '. Segui \u00ab' + chosen.name + '\u00bb: ' + chosen.desc + ' Prendi circa ' + synTarget + ' carte che lavorano con questo tema (ne hai ' + syn + '). Puoi cambiare tema toccando un\'altra scelta.';
+        r.search = { id: 'coach:tema:' + chosen.id, name: chosen.name, q: chosen.q, theme: chosen };
+      } else r.text = (isC ? 'Non riconosco una meccanica precisa nel testo del comandante. ' : '') + 'Scegli tu una meccanica o un tipo di creatura dall\'elenco qui sotto: ti propongo le carte pi\u00f9 usate nei tuoi colori.';
+    } else if (id === 'base') {
+      const g = gaps[0];
+      r.title = 'Metti le fondamenta';
+      r.text = 'Un mazzo solido ha rampa (per giocare le carte prima), pesca (per non restare senza carte) e rimozioni (per rispondere all\'avversario). Mancano: ' + gaps.map(x => Strategy_roleName(x.role) + ' (' + x.have + '/' + x.want + ')').join(', ') + '. Parto da: ' + Strategy_roleName(g.role) + '.';
+      r.search = Object.assign({}, ROLES[g.role], { id: 'coach:base:' + g.role, role: g.role });
+    } else if (id === 'fill') {
+      r.title = 'Completa il mazzo';
+      r.text = 'Mancano circa ' + Math.max(0, spellTarget - nl) + ' carte non terra. Aggiungi creature e carte che fanno vincere' + (chosen ? ', restando sul tema \u00ab' + chosen.name + '\u00bb' : '') + '. Controlla la curva di mana: poche carte molto costose.';
+      r.search = chosen ? { id: 'coach:fill:' + chosen.id, name: chosen.name, q: chosen.q, theme: chosen } : null;
+    } else if (id === 'terre') {
+      r.title = 'Sistema le terre';
+      r.text = 'Per questo mazzo servono circa ' + ideal + ' terre, ne hai ' + lands + '. Prima aggiungi le terre speciali che producono pi\u00f9 colori (sotto), poi completa con le terre base in proporzione ai simboli di mana.';
+      r.search = { id: 'coach:terre', name: 'Terre utili', q: 't:land -t:basic', type: 'land', land: true };
+      r.basics = true;
+    } else {
+      r.title = 'Rifinitura';
+      r.text = 'Il mazzo \u00e8 quasi completo. Controlla gli avvisi qui sopra (copie, legalit\u00e0, identit\u00e0 di colore), sistema la curva e poi provalo nella pagina Prova contro un secondo mazzo.';
+    }
+    return r;
+  }
+  function Strategy_roleName(r) { return (ROLES[r] || {}).name || r; }
+
+  return { THEMES, ROLES, ARCH, analyze, tribeTheme, matches, cmdThemes, coach };
 })();
 if (typeof module !== 'undefined') module.exports = Strategy;

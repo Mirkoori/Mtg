@@ -286,14 +286,49 @@ function stratPool(d) {
   Strategy.THEMES.forEach(t => pool.push(t));
   return { a, pool };
 }
+function coachHtml(co) {
+  let h = '<div class="coach"><div class="steps">' + co.steps.map((x, i) => `<span class="stp ${x.done ? 'done' : ''} ${x.cur ? 'cur' : ''}">${x.done ? '\u2713' : i + 1} ${esc(x.name)}</span>`).join('') + '</div>';
+  h += `<div class="ctitle">Passo ${co.idx + 1} di ${co.steps.length}: ${esc(co.title)}</div><div class="msg">${esc(co.text)}</div>`;
+  if (co.id === 'tema' && co.themes.length > 1) h += '<div class="thm">' + co.themes.map(t => `<span class="chip ${co.chosen && co.chosen.id === t.id ? 'on' : ''}" data-act="stpick" data-t="${esc(t.id)}" title="${esc(t.desc)}">${esc(t.name)}</span>`).join('') + '</div>';
+  const acts = [];
+  if (co.basics) acts.push('<button data-act="stbasics">Completa con terre base</button>');
+  if (co.id === 'fine') acts.push('<a href="prova.html"><button class="secondary" type="button">Prova il mazzo</button></a>');
+  if (co.canSkip) acts.push(`<button class="link" data-act="stskip" data-s="${esc(co.id === 'base' ? 'base:' + co.gaps[0].role : co.id)}">Salta questo passo</button>`);
+  if (acts.length) h += '<div class="row">' + acts.join('') + '</div>';
+  return h + '</div>';
+}
+async function addBasics() {
+  const d = deck(); if (!d) return;
+  const { a } = stratPool(d), co = Strategy.coach(d, S.cards, a);
+  const need = co.ideal - co.lands; if (need <= 0) return toast('Le terre sono gi\u00e0 sufficienti');
+  const st = Deck.stats(d, S.cards), ident = [...deckColors(d)].filter(x => 'WUBRG'.includes(x));
+  let cols = ident.length ? ident : Object.keys(st.pips).filter(k => st.pips[k] > 0);
+  if (!cols.length) return toast('Servono carte colorate per sapere quali terre base aggiungere');
+  const w = cols.map(k => Math.max(1, st.pips[k] || 0)), tot = w.reduce((x, y) => x + y, 0);
+  const n = w.map(x => Math.floor(need * x / tot)); let left = need - n.reduce((x, y) => x + y, 0);
+  for (let i = 0; left > 0; i = (i + 1) % cols.length, left--) n[i]++;
+  const NAME = { W: 'Plains', U: 'Island', B: 'Swamp', R: 'Mountain', G: 'Forest' };
+  try {
+    const r = await scry('/cards/collection', { identifiers: cols.map(k => ({ name: NAME[k] })) });
+    const added = [];
+    (r.data || []).forEach(x => {
+      const k = cols.find(c => NAME[c] === x.name); const q = n[cols.indexOf(k)]; if (!q) return;
+      const s2 = slim(x); S.cards[s2.id] = Object.assign(S.cards[s2.id] || {}, s2); Deck.addCard(d, s2.id, 'lands', q); added.push(s2.id);
+    });
+    save(); render(); toast('Aggiunte ' + need + ' terre base');
+    await stratItalian(added.map(id => S.cards[id])); save(); render();
+  } catch (e) { toast(e.message); }
+}
 function renderStrategy(d) {
   const st = S.strat, el = $('stratBox');
   if (st.deckId !== d.id) { st.deckId = d.id; st.colors = deckColors(d); st.sel = null; st.results = []; st.msg = ''; st.shown = 24; }
   const { a, pool } = stratPool(d);
-  let h = `<details id="stratDet" ${st.open ? 'open' : ''}><summary>Strategia e consigli</summary>`;
-  if (a.nSpell < 10) {
-    h += '<div class="msg" style="margin-top:8px">Non sai da dove partire? Scegli qui sotto una meccanica che ti piace (o un tipo di creatura) e ti propongo carte adatte al formato e ai colori. Man mano che il mazzo cresce, qui vedrai anche che stile sta prendendo e cosa manca.</div>';
-  } else {
+  const co = Strategy.coach(d, S.cards, a);
+  let h = `<details id="stratDet" ${st.open ? 'open' : ''}><summary>Strategia e consigli <span class="msg">\u2014 passo ${co.idx + 1}: ${esc(co.title)}</span></summary>`;
+  h += coachHtml(co);
+  const akey = d.id + ':' + (co.search ? co.search.id : co.id);
+  if (co.search && st.open && st.autoKey !== akey) { st.autoKey = akey; st.sel = co.search; setTimeout(stratSearch, 0); }
+  if (a.nSpell >= 10) {
     h += `<div class="arch">Stile di gioco: <b>${esc(a.archetype.name)}</b> <span class="msg">(costo medio ${a.avg.toFixed(1)})</span><div class="msg">${esc(a.archetype.text)}</div></div>`;
     const top = a.tribes.concat(a.themes.filter(x => x.n >= 3).slice(0, 5));
     if (top.length) {
@@ -358,7 +393,8 @@ async function stratSearch() {
   st.msg = `Cerco carte per \u00ab${st.sel.name}\u00bb\u2026`; st.results = []; st.shown = 24; renderStrategy(d);
   const cols = [...st.colors].join('').toLowerCase();
   let q = st.sel.q + ' game:paper' + (f.scry ? ' f:' + f.scry : '') + (cols ? ' id<=' + cols : '');
-  q += st.type ? ' t:' + st.type : ' -t:land';
+  const ty = st.type || st.sel.type;
+  q += ty ? ' t:' + ty : ' -t:land';
   try {
     const data = await searchPages(q, 3, 'edhrec');
     if (seq !== st.seq) return;
@@ -389,12 +425,17 @@ document.addEventListener('click', ev => {
   else if (act === 'sttheme' || act === 'strole') {
     const st = S.strat; const pool = stratPool(d).pool;
     st.sel = act === 'strole' ? Strategy.ROLES[t.dataset.r] : pool.find(x => x.id === t.dataset.t);
+    const co = Strategy.coach(d, S.cards, Strategy.analyze(d, S.cards));
+    if (st.sel && co.id === 'cmd' && co.search) st.sel = { id: st.sel.id, name: 'Comandanti: ' + st.sel.name, q: co.search.q + ' ' + st.sel.q, section: 'commander' };
     if (st.sel) stratSearch();
   } else if (act === 'stcol') {
     const st = S.strat, c = t.dataset.c; st.colors.has(c) ? st.colors.delete(c) : st.colors.add(c);
     if (st.sel) stratSearch(); else renderStrategy(d);
   } else if (act === 'stopen') { const c = S.strat.results[+t.dataset.i]; if (c) { S.cards[c.id] = Object.assign(S.cards[c.id] || {}, c); openModal(c.id, null); } }
-  else if (act === 'stadd') { const c = S.strat.results[+t.dataset.i]; if (c) addToDeck(c, 'auto'); }
+  else if (act === 'stadd') { const c = S.strat.results[+t.dataset.i]; if (c) addToDeck(c, (S.strat.sel && S.strat.sel.section) || 'auto'); }
+  else if (act === 'stpick') { d.strat = d.strat || {}; d.strat.theme = t.dataset.t; save(); render(); }
+  else if (act === 'stskip') { d.strat = d.strat || {}; d.strat.skip = d.strat.skip || {}; d.strat.skip[t.dataset.s] = true; save(); render(); }
+  else if (act === 'stbasics') addBasics();
   else if (act === 'stmore') { const st = S.strat; st.shown += 24; renderStrategy(d); stratItalian(st.results.slice(0, st.shown)).then(() => renderStrategy(d)); }
   else if (act === 'radd') { addToDeck(S.results[+t.dataset.i], $('target').value); }
 });
