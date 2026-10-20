@@ -90,7 +90,7 @@ function render() {
   $('resBox').hidden = !ROWS.length; $('bar').hidden = !ROWS.length; $('btnAll').hidden = !ROWS.length;
   $('list').innerHTML = ROWS.map((r, i) => {
     const bad = !!r.err || r.price == null, cls = 'it' + (bad ? ' bad' : '') + (r.sent ? ' sent' : '');
-    const info = r.sent ? 'gi\u00e0 inviata' : (r.err ? r.err : (r.src === 'cardtrader' ? 'pi\u00f9 basso ora: ' + money(r.ref / 100) + ' (' + r.nOffers + ' offerte)' : (r.src === 'altra lingua' ? 'pi\u00f9 basso in altra lingua: ' + money(r.ref / 100) : (r.src === 'Scryfall' ? 'nessuna offerta: prezzo da Scryfall ' + money(r.ref / 100) : 'nessun prezzo trovato: inseriscilo tu'))));
+    const info = r.sent ? 'gi\u00e0 inviata' : (r.err ? r.err : (r.src === 'cardtrader' ? 'pi\u00f9 basso ora: ' + money(r.ref / 100) + ' (' + r.nOffers + ' offerte)' : (r.src === 'altra lingua' ? 'pi\u00f9 basso in altra lingua: ' + money(r.ref / 100) : (r.src === 'Collezione' ? 'prezzo della Collezione: ' + money(r.ref / 100) : r.src === 'Scryfall' ? 'nessuna offerta: prezzo da Scryfall ' + money(r.ref / 100) : 'nessun prezzo trovato: inseriscilo tu'))));
     return '<div class="' + cls + '" data-i="' + i + '"><input type="checkbox" data-on="' + i + '"' + (r.on ? ' checked' : '') + (r.err || r.sent ? ' disabled' : '') + '>' +
       (r.img ? '<img loading="lazy" src="' + esc(r.img) + '" alt="">' : '<span></span>') +
       '<div><div class="nm">' + esc(r.nameIt) + (r.foil ? ' <span class="tag foil">foil</span>' : '') + '</div><div class="sub">' + esc(r.setName || r.set.toUpperCase()) + ' #' + esc(r.cn) + (r.version ? ' \u00b7 ' + esc(r.version) : '') + '</div><div class="sub' + (r.err ? ' err' : '') + '">' + esc(info) + '</div></div>' +

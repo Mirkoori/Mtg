@@ -559,7 +559,7 @@ const Core = (() => {
   }
   async function sellPlan(token, rows, o, progress = () => {}) {
     o = o || {};
-    const floor = Math.round((parseFloat(o.floor) || 0) * 100), rule = o.rule === 'under' ? 'under' : 'low';
+    const floor = Math.round((parseFloat(o.floor) || 0) * 100), rule = o.rule === 'under' ? 'under' : (o.rule === 'coll' ? 'coll' : 'low');
     const idx = await expansionIndex(token);
     const out = [], need = new Map(); // espansione -> combinazioni lingua/foil da leggere
     let n = 0;
@@ -574,7 +574,7 @@ const Core = (() => {
       row.bp = b.id; row.exp = ex.id; row.version = b.version || null;
       row.props = { condition: r.cond || 'Near Mint', mtg_language: r.lang || 'it', mtg_foil: !!r.foil };
       const pe = propCheck(b, row.props); if (pe) row.err = pe;
-      if (!row.err) { const k = ex.id + '|' + row.props.mtg_language + '|' + (row.props.mtg_foil ? 1 : 0); need.set(k, { exp: ex.id, lang: row.props.mtg_language, foil: row.props.mtg_foil }); }
+      if (!row.err && rule !== 'coll') { const k = ex.id + '|' + row.props.mtg_language + '|' + (row.props.mtg_foil ? 1 : 0); need.set(k, { exp: ex.id, lang: row.props.mtg_language, foil: row.props.mtg_foil }); }
       out.push(row);
     }
     const mk = new Map(); let m = 0;
@@ -585,6 +585,10 @@ const Core = (() => {
     const anyLang = new Map();
     for (const row of out) {
       if (row.err) continue;
+      if (rule === 'coll') { // prezzo della Collezione (Scryfall), senza guardare le offerte
+        const e = r_eur(row); if (e > 0) { row.ref = Math.round(e * 100); row.src = 'Collezione'; row.price = Math.max(2, row.ref) / 100; } else { row.ref = null; row.price = null; row.src = 'nessuno'; }
+        continue;
+      }
       const rank = COND[row.props.condition] ?? 1;
       const best = list => (list || []).filter(p => (COND[(p.properties_hash || {}).condition] ?? 9) <= rank && p.price && p.price.cents > 0)
         .reduce((a, p) => (a === null || p.price.cents < a ? p.price.cents : a), null);
