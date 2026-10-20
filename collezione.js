@@ -30,7 +30,10 @@ const C = { entries: [], cards: {}, it: {}, itSets: [], notFound: [], view: stor
 const SELL = (function () { try { return JSON.parse(localStorage.getItem('mtg_sell_list')) || {}; } catch (e) { return {}; } })();
 const sellN = x => { const s = SELL[x.key]; return s ? (s.n || 0) + (s.f || 0) : 0; };
 function sellSave() { Object.keys(SELL).forEach(k => { const s = SELL[k]; if (!(s.n > 0) && !(s.f > 0)) delete SELL[k]; }); store.set('mtg_sell_list', JSON.stringify(SELL)); }
-const F = { sell: false, q: '', colors: new Set(), type: '', set: '', rar: '', foil: false, sort: 'name', group: 'none' };
+let TOT = {};
+const MAXC = 4;
+const totOf = x => TOT[cardOf(x).id] || 0;
+const F = { many: false, sell: false, q: '', colors: new Set(), type: '', set: '', rar: '', foil: false, sort: 'name', group: 'none' };
 
 const COLOR_IT = { W: 'Bianco', U: 'Blu', B: 'Nero', R: 'Rosso', G: 'Verde', M: 'Multicolore', C: 'Incolore' };
 const COLOR_ORDER = ['W', 'U', 'B', 'R', 'G', 'M', 'C'];
@@ -214,6 +217,7 @@ function matches(x) {
   const c = cardOf(x);
   if (F.foil && !x.foilQty) return false;
   if (F.sell && !sellN(x)) return false;
+  if (F.many && (totOf(x) <= MAXC || /Basic Land/.test(cardOf(x).type || ''))) return false;
   if (F.set && c.set !== F.set) return false;
   if (F.rar && c.rarity !== F.rar) return false;
   if (F.type && typeCat(c) !== F.type) return false;
@@ -251,13 +255,14 @@ function tileHtml(x, i) {
     return `<div class="lrow" data-i="${i}"><span class="q">${x.qty}${x.foilQty ? '<small title="foil"> \u2605</small>' : ''}${sellN(x) ? '<small title="in vendita"> \u20ac' + sellN(x) + '</small>' : ''}</span><span class="n">${nm}</span><span class="m">${manaHtml(c.mana)}</span><span class="s">${esc(c.set)}</span><span class="p">${c.eur ? money(priceOf(x) / x.qty) : ''}</span></div>`;
   }
   return `<div class="tile" data-i="${i}">${c.img ? `<img loading="lazy" src="${esc(c.img)}" alt="${nm}">` : `<div class="noimg">${nm}</div>`}
-    ${x.qty > 1 ? `<span class="qb">&times;${x.qty}</span>` : ''}${x.foilQty ? '<span class="fb">foil</span>' : ''}${sellN(x) ? '<span class="sb">in vendita &times;' + sellN(x) + '</span>' : ''}<div class="cap">${nm} <small>${esc(c.set)}</small></div>${c.eur || c.eurFoil ? '<div class="pz">' + money(priceOf(x) / x.qty) + (x.qty > 1 ? ' <small>cad.</small>' : '') + '</div>' : '<div class="pz"><small>prezzo n.d.</small></div>'}</div>`;
+    ${x.qty > 1 ? `<span class="qb">&times;${x.qty}</span>` : ''}${x.foilQty ? '<span class="fb">foil</span>' : ''}${totOf(x) > MAXC && !/Basic Land/.test(c.type || '') ? '<span class="xb">tot ' + totOf(x) + '</span>' : ''}${sellN(x) ? '<span class="sb">in vendita &times;' + sellN(x) + '</span>' : ''}<div class="cap">${nm} <small>${esc(c.set)}</small></div>${c.eur || c.eurFoil ? '<div class="pz">' + money(priceOf(x) / x.qty) + (x.qty > 1 ? ' <small>cad.</small>' : '') + '</div>' : '<div class="pz"><small>prezzo n.d.</small></div>'}</div>`;
 }
 
 let view = [];
 function render() {
   if (!C.entries.length) return;
   const all = items();
+  TOT = {}; all.forEach(x => { const id = cardOf(x).id; TOT[id] = (TOT[id] || 0) + x.qty; });
   // statistiche
   const copies = all.reduce((a, x) => a + x.qty, 0), uniq = new Set(all.map(x => cardOf(x).id)).size;
   const value = all.reduce((a, x) => a + priceOf(x), 0), nsets = new Set(all.map(x => cardOf(x).set)).size;
@@ -324,13 +329,14 @@ let qTimer = null;
 $('q').oninput = () => { clearTimeout(qTimer); qTimer = setTimeout(() => { F.q = $('q').value.trim(); C.limit = 120; render(); }, 200); };
 $('colors').addEventListener('click', ev => { const ch = ev.target.closest('.chip'); if (!ch) return; const k = ch.dataset.c; F.colors.has(k) ? F.colors.delete(k) : F.colors.add(k); ch.classList.toggle('on'); C.limit = 120; render(); });
 [['fType', 'type'], ['fSet', 'set'], ['fRar', 'rar'], ['fSort', 'sort'], ['fGroup', 'group']].forEach(([id, k]) => { $(id).onchange = () => { F[k] = $(id).value; C.limit = 120; render(); }; });
+$('fMany').onchange = () => { F.many = $('fMany').checked; C.limit = 120; render(); };
 $('fSell').onchange = () => { F.sell = $('fSell').checked; C.limit = 120; render(); };
 $('fFoil').onchange = () => { F.foil = $('fFoil').checked; C.limit = 120; render(); };
 document.querySelectorAll('[data-view]').forEach(b => b.onclick = () => { C.view = b.dataset.view; store.set('mtg_col_view', C.view); render(); });
 $('more').onclick = () => { C.limit += 120; render(); };
 $('btnReset').onclick = () => {
-  Object.assign(F, { sell: false, q: '', type: '', set: '', rar: '', foil: false, sort: 'name', group: 'none' }); F.colors.clear();
-  $('q').value = ''; $('fFoil').checked = false; $('fSell').checked = false; $('fSort').value = 'name'; $('fGroup').value = 'none'; C.limit = 120; buildFilters(); render();
+  Object.assign(F, { many: false, sell: false, q: '', type: '', set: '', rar: '', foil: false, sort: 'name', group: 'none' }); F.colors.clear();
+  $('q').value = ''; $('fFoil').checked = false; $('fSell').checked = false; $('fMany').checked = false; $('fSort').value = 'name'; $('fGroup').value = 'none'; C.limit = 120; buildFilters(); render();
 };
 $('btnClear').onclick = async () => {
   if (!confirm('Rimuovere la collezione salvata su questo dispositivo? Il file CSV resta dov\u2019\u00e8.')) return;
