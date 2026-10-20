@@ -541,6 +541,97 @@ const Core = (() => {
     };
   }
 
+  // ---------- vendita: prezzi consigliati e inserimento nell'inventario
+  const SELL_COND = ['Mint', 'Near Mint', 'Slightly Played', 'Moderately Played', 'Played', 'Heavily Played', 'Poor'];
+  function propCheck(bp, props) { // controlla che i valori siano ammessi dalla carta (se CardTrader li elenca)
+    const ed = bp && (bp.editable_properties || bp.editableProperties);
+    if (!Array.isArray(ed) || !ed.length) return null;
+    for (const k of Object.keys(props)) {
+      const def = ed.find(x => x.name === k);
+      if (!def) { if (k === 'mtg_foil' && props[k] === false) continue; return `proprieta ${k} non modificabile per questa carta`; }
+      const pv = def.possible_values;
+      if (Array.isArray(pv) && pv.length) {
+        const vals = pv.map(v => (v && typeof v === 'object') ? (v.value !== undefined ? v.value : v.name) : v);
+        if (!vals.some(v => String(v) === String(props[k]))) return `${k}=${props[k]} non ammesso`;
+      }
+    }
+    return null;
+  }
+  async function sellPlan(token, rows, o, progress = () => {}) {
+    o = o || {};
+    const floor = Math.round((parseFloat(o.floor) || 0) * 100), rule = o.rule === 'under' ? 'under' : 'low';
+    const idx = await expansionIndex(token);
+    const out = [], need = new Map(); // espansione -> combinazioni lingua/foil da leggere
+    let n = 0;
+    for (const r of rows) {
+      progress(`Cerco le carte su CardTrader ${++n}/${rows.length}…`);
+      const row = Object.assign({}, r, { err: null, bp: null });
+      const ex = idx.byCode.get(String(r.set || '').toLowerCase()) || idx.byName.get(norm(r.setName || ''));
+      if (!ex) { row.err = 'edizione non trovata su CardTrader'; out.push(row); continue; }
+      let bps; try { bps = singleCards(await getBlueprints(token, ex.id)); } catch (e) { row.err = 'edizione non leggibile (' + e.message + ')'; out.push(row); continue; }
+      const b = pickBlueprint(bps, { name: r.name, collector_number: r.cn });
+      if (!b) { row.err = 'carta non trovata nell\'edizione'; out.push(row); continue; }
+      row.bp = b.id; row.exp = ex.id; row.version = b.version || null;
+      row.props = { condition: r.cond || 'Near Mint', mtg_language: r.lang || 'it', mtg_foil: !!r.foil };
+      const pe = propCheck(b, row.props); if (pe) row.err = pe;
+      if (!row.err) { const k = ex.id + '|' + row.props.mtg_language + '|' + (row.props.mtg_foil ? 1 : 0); need.set(k, { exp: ex.id, lang: row.props.mtg_language, foil: row.props.mtg_foil }); }
+      out.push(row);
+    }
+    const mk = new Map(); let m = 0;
+    for (const [k, v] of need) {
+      progress(`Leggo i prezzi attuali ${++m}/${need.size}…`);
+      try { mk.set(k, await fetchProducts(token, v.exp, v.lang, v.foil)); } catch (e) { mk.set(k, null); }
+    }
+    const anyLang = new Map();
+    for (const row of out) {
+      if (row.err) continue;
+      const rank = COND[row.props.condition] ?? 1;
+      const best = list => (list || []).filter(p => (COND[(p.properties_hash || {}).condition] ?? 9) <= rank && p.price && p.price.cents > 0)
+        .reduce((a, p) => (a === null || p.price.cents < a ? p.price.cents : a), null);
+      const k = row.exp + '|' + row.props.mtg_language + '|' + (row.props.mtg_foil ? 1 : 0);
+      const list = (mk.get(k) || {})[String(row.bp)] || [];
+      let ref = best(list); row.nOffers = list.length; row.src = 'cardtrader';
+      if (ref === null && mk.get(k) !== null) { // nessuna offerta in quella lingua: guardo qualsiasi lingua
+        const k2 = row.exp + '|any|' + (row.props.mtg_foil ? 1 : 0);
+        if (!anyLang.has(k2)) { try { anyLang.set(k2, await fetchProducts(token, row.exp, null, row.props.mtg_foil)); } catch (e) { anyLang.set(k2, null); } }
+        const l2 = ((anyLang.get(k2) || {})[String(row.bp)]) || [];
+        ref = best(l2); if (ref !== null) row.src = 'altra lingua';
+      }
+      if (ref === null && r_eur(row) > 0) { ref = Math.round(r_eur(row) * 100); row.src = 'Scryfall'; }
+      if (ref === null) { row.ref = null; row.price = null; row.src = 'nessuno'; continue; }
+      row.ref = ref;
+      let pc = rule === 'under' ? ref - 1 : ref; if (pc < floor) pc = floor; if (pc < 1) pc = 1;
+      row.price = pc / 100;
+    }
+    return out;
+  }
+  const r_eur = r => (r.foil ? (r.eurFoil || r.eur) : (r.eur || 0)) || 0;
+  async function sellSend(token, items, progress = () => {}) {
+    const results = [];
+    for (let i = 0; i < items.length; i += 100) {
+      const chunk = items.slice(i, i + 100);
+      progress(`Invio ${Math.min(items.length, i + chunk.length)}/${items.length}…`);
+      const d = await ct('POST', '/products/bulk_create', token, null, { products: chunk.map(x => ({ blueprint_id: x.blueprint_id, price: x.price, quantity: x.quantity, properties: x.properties })) });
+      const job = d && (d.job || d.uuid || d.job_uuid);
+      if (!job) throw new ApiError(0, 'Risposta inattesa da CardTrader: ' + JSON.stringify(d).slice(0, 200));
+      let st = null;
+      for (let t = 0; t < 120; t++) {
+        await sleep(1300);
+        st = await ct('GET', '/jobs/' + job, token);
+        if (st && (st.state === 'completed' || st.state === 'unprocessable' || st.status === 'completed')) break;
+      }
+      const state = st && (st.state || st.status);
+      if (state !== 'completed') { chunk.forEach(() => results.push({ ok: false, error: state === 'unprocessable' ? 'CardTrader ha rifiutato il gruppo' : 'CardTrader non ha ancora finito (controlla "I miei oggetti")' })); continue; }
+      const arr = st.results || st.items || [];
+      chunk.forEach((x, j) => {
+        const r = arr.find(y => y.job_index === j) || arr[j] || {};
+        const errs = r.errors && (Array.isArray(r.errors) ? r.errors.length : Object.keys(r.errors).length) ? JSON.stringify(r.errors) : null;
+        results.push(errs || !(r.product_id || r.id) ? { ok: false, error: errs || 'nessun prodotto creato' } : { ok: true, product_id: r.product_id || r.id });
+      });
+    }
+    return results;
+  }
+
   function cartSummary(cart) {
     let count = 0, subtotal = null;
     if (cart && typeof cart === 'object') {
@@ -550,12 +641,12 @@ const Core = (() => {
     return { items: count, subtotal };
   }
   const cart = async token => cartSummary(await ct('GET', '/cart', token));
-  // Unica operazione di scrittura dell'app: cart/add (sempre via CardTrader Zero). Nessun acquisto.
+  // Operazioni di scrittura: cart/add (sempre via CardTrader Zero, nessun acquisto) e products/bulk_create (solo su richiesta esplicita nella pagina Vendi).
   const cartAdd = async (token, productId, quantity) =>
     cartSummary(await ct('POST', '/cart/add', token, null,
       { product_id: parseInt(productId), quantity: parseInt(quantity) || 1, via_cardtrader_zero: true }));
 
-  return { config, ApiError, info, expansions, expansionInfo, buildPlan, buildListPlan, cart, cartAdd, norm, nameKeys };
+  return { config, ApiError, info, expansions, expansionInfo, buildPlan, buildListPlan, cart, cartAdd, norm, nameKeys, sellPlan, sellSend, SELL_COND };
 })();
 
 if (typeof module !== 'undefined') module.exports = Core;

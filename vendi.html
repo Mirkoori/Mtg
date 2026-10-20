@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#070605">
+<title>Vendi su CardTrader</title>
+<style>
+  :root { --bg:#f5f4f0; --card:#ffffff; --ink:#1d1d1b; --muted:#6b6a64; --line:#e3e1d9; --accent:#1f5f4a; --accent-ink:#ffffff; --warn:#a15c00; --bad:#b3261e; --ok:#1f7a4d; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#161715; --card:#1f201e; --ink:#ecebe6; --muted:#9b9a93; --line:#33342f; --accent:#4fb08c; --accent-ink:#0d1f18; --warn:#e0a24a; --bad:#f2837b; --ok:#6cd09c; } }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; }
+  main { max-width:1000px; margin:0 auto; padding:14px 12px 90px; }
+  nav { display:flex; gap:6px; margin-bottom:12px; flex-wrap:wrap; }
+  nav a { padding:7px 14px; border-radius:999px; border:1px solid var(--line); text-decoration:none; color:var(--ink); background:var(--card); font-weight:600; font-size:14px; }
+  nav a.on { background:var(--accent); color:var(--accent-ink); border-color:var(--accent); }
+  h1 { font-size:21px; margin:0 0 10px; }
+  .panel { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:12px 14px; margin-bottom:12px; }
+  select, input[type=text], input[type=password], input[type=number] { width:100%; padding:9px 10px; border:1px solid var(--line); border-radius:8px; background:var(--bg); color:var(--ink); font:inherit; font-size:16px; }
+  button { font:inherit; padding:8px 14px; border-radius:8px; border:1px solid var(--accent); background:var(--accent); color:var(--accent-ink); cursor:pointer; font-weight:600; }
+  button.secondary { background:transparent; color:var(--accent); }
+  button:disabled { opacity:.5; cursor:default; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:10px; }
+  label.f { display:block; font-size:12.5px; color:var(--muted); }
+  label.f > select, label.f > input { margin-top:3px; }
+  .row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-top:10px; }
+  .msg { color:var(--muted); font-size:13.5px; } .err { color:var(--bad); } .okc { color:var(--ok); }
+  .it { display:grid; grid-template-columns:auto 44px 1fr auto; gap:8px; align-items:center; padding:7px 4px; border-bottom:1px solid var(--line); }
+  .it img { width:44px; border-radius:4px; display:block; } .it .nm { font-weight:600; line-height:1.25; } .it .sub { font-size:12px; color:var(--muted); }
+  .it .pr { display:flex; flex-direction:column; align-items:flex-end; gap:3px; }
+  .it input[type=number] { width:78px; padding:5px 6px; font-size:14px; text-align:right; }
+  .it.bad { opacity:.65; } .it.sent { opacity:.5; }
+  .tag { font-size:11px; padding:0 6px; border-radius:9px; border:1px solid var(--line); color:var(--muted); }
+  .tag.foil { color:var(--warn); border-color:var(--warn); }
+  #toast { position:fixed; left:50%; bottom:22px; transform:translateX(-50%); background:#222; color:#fff; padding:9px 16px; border-radius:20px; font-size:14px; z-index:30; max-width:90%; text-align:center; }
+  #bar { position:sticky; bottom:0; background:var(--card); border:1px solid var(--line); border-radius:12px; padding:10px 12px; margin-top:12px; }
+</style>
+<link rel="stylesheet" href="theme.css?v=2">
+</head>
+<body>
+<main>
+  <nav><a href="index.html">Carrello</a><a href="mazzi.html">Mazzi</a><a href="collezione.html">Collezione</a><a href="vendi.html" class="on">Vendi</a><a href="prova.html">Prova</a></nav>
+  <h1>Vendi su CardTrader</h1>
+  <div class="panel msg">Scegli quali carte della tua collezione inserire su CardTrader. L'app calcola il prezzo dalle offerte attuali, tu controlli l'elenco e confermi. Non invia mai niente da sola: prima una carta di prova, poi il resto.</div>
+
+  <section class="panel">
+    <label class="f">Token CardTrader (lo stesso del Carrello; per inserire le carte deve avere il permesso di scrittura)
+      <input type="password" id="token" autocomplete="off" placeholder="Incolla il token"></label>
+    <div class="grid" style="margin-top:10px">
+      <label class="f">Cosa vendere
+        <select id="what"><option value="extra">Solo le copie in eccesso (oltre ai mazzi)</option><option value="all">Tutta la collezione</option></select></label>
+      <label class="f">Tieni sempre almeno (copie per carta)
+        <input type="number" id="keep" min="0" value="0"></label>
+      <label class="f">Terre base
+        <select id="basics"><option value="no">Non vendere</option><option value="yes">Includi</option></select></label>
+      <label class="f">Condizione
+        <select id="cond"></select></label>
+      <label class="f">Lingua delle carte
+        <select id="lang"><option value="it">Italiano</option><option value="en">Inglese</option></select></label>
+      <label class="f">Prezzo
+        <select id="rule"><option value="low">Uguale al pi&ugrave; basso</option><option value="under">1 centesimo sotto il pi&ugrave; basso</option></select></label>
+      <label class="f">Prezzo minimo (&euro;)
+        <input type="number" id="floor" min="0.02" step="0.01" value="0.10"></label>
+      <label class="f">Filtra per nome
+        <input type="text" id="q" placeholder="(facoltativo)" autocomplete="off"></label>
+    </div>
+    <div class="row"><button id="btnPlan">Prepara l'elenco</button><progress id="prog" hidden></progress></div>
+    <div class="msg" id="msgPlan"></div>
+  </section>
+
+  <section class="panel" id="resBox" hidden>
+    <div class="msg" id="sumTop"></div>
+    <div id="list"></div>
+  </section>
+
+  <div id="bar" hidden>
+    <div class="msg" id="sumBar"></div>
+    <div class="row">
+      <button id="btnTest">Invia 1 carta di prova</button>
+      <button id="btnRest" class="secondary" disabled>Invia le altre</button>
+      <button id="btnAll" class="secondary" hidden>Seleziona / deseleziona tutto</button>
+    </div>
+    <div class="msg" id="msgSend"></div>
+  </div>
+</main>
+<div id="toast" hidden></div>
+<script src="config.js?v=2"></script>
+<script src="sync.js?v=4"></script>
+<script src="core.js?v=8"></script>
+<script src="scry.js?v=8"></script>
+<script src="vendi.js?v=1"></script>
+</body>
+</html>
