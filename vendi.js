@@ -45,7 +45,21 @@ function deckNeed() { // copie usate nei mazzi, per nome inglese
   jget('mtg_decks', []).forEach(d => (d.cards || []).forEach(e => { const c = cards[e.id]; if (!c) return; const k = String(c.name).toLowerCase(); need[k] = (need[k] || 0) + (e.qty || 1); }));
   return need;
 }
+function buildFromList(entries) {
+  const list = jget('mtg_sell_list', {}), lang = $('lang').value, cond = $('cond').value, sent = sentMap(), rows = [];
+  entries.forEach(e => {
+    const s = list[e.key]; if (!s) return; const c = CARDS[e.key];
+    [[false, Math.min(s.n || 0, e.qty - (e.foilQty || 0))], [true, Math.min(s.f || 0, e.foilQty || 0)]].forEach(([foil, n]) => {
+      if (n <= 0) return;
+      const r = { key: e.key, name: c.name, nameIt: (IT[c.id] && IT[c.id][0]) || c.name_it || c.name, set: String(c.set || e.set || '').toLowerCase(), setName: c.setName, cn: c.cn || e.cn, img: c.img, qty: n, maxQty: n, foil: foil, lang: lang, cond: cond, eur: c.eur || 0, eurFoil: c.eurFoil || 0, on: true };
+      rows.push(r);
+    });
+  });
+  rows.sort((a, b) => a.nameIt.localeCompare(b.nameIt, 'it'));
+  return rows;
+}
 function buildRows(entries) {
+  if ($('what').value === 'list') return buildFromList(entries);
   const what = $('what').value, keepN = Math.max(0, parseInt($('keep').value) || 0), basics = $('basics').value === 'yes';
   const q = $('q').value.trim().toLowerCase(), need = what === 'extra' ? deckNeed() : {};
   const lang = $('lang').value, cond = $('cond').value, sent = sentMap();
@@ -112,7 +126,7 @@ $('btnPlan').onclick = async () => {
     const entries = await loadCollection();
     if (!entries) { msg.className = 'msg err'; msg.textContent = 'Non c\'\u00e8 nessuna collezione su questo dispositivo: caricala prima nella pagina Collezione.'; return; }
     ROWS = buildRows(entries);
-    if (!ROWS.length) { msg.textContent = 'Con questi filtri non c\'\u00e8 niente da vendere. Prova "Tutta la collezione" oppure togli il filtro.'; render(); return; }
+    if (!ROWS.length) { msg.textContent = 'Non c\'\u00e8 niente da vendere con questa scelta. Nella Collezione apri una carta e usa "Da vendere", oppure scegli un\'altra opzione in "Cosa vendere".'; render(); return; }
     const planned = await Core.sellPlan(token(), ROWS, { floor: $('floor').value, rule: $('rule').value }, t => { msg.textContent = t; });
     planned.forEach((p, i) => { Object.assign(ROWS[i], p, { on: ROWS[i].on && !p.err }); });
     msg.textContent = 'Fatto. Controlla l\'elenco qui sotto.';
@@ -122,7 +136,7 @@ $('btnPlan').onclick = async () => {
 };
 
 let tested = false;
-function mark(r, res) { const m = sentMap(); if (res.ok) { m[rowKey(r)] = { id: res.product_id, t: Date.now() }; r.sent = true; r.on = false; } else { r.err = 'non inviata: ' + res.error; r.on = false; } store.set('mtg_sell_sent', JSON.stringify(m)); }
+function mark(r, res) { const m = sentMap(); if (res.ok) { m[rowKey(r)] = { id: res.product_id, t: Date.now() }; r.sent = true; r.on = false; const L = jget('mtg_sell_list', {}); if (L[r.key]) { const f = r.foil ? 'f' : 'n'; L[r.key][f] = Math.max(0, (L[r.key][f] || 0) - r.qty); if (!(L[r.key].n > 0) && !(L[r.key].f > 0)) delete L[r.key]; store.set('mtg_sell_list', JSON.stringify(L)); } } else { r.err = 'non inviata: ' + res.error; r.on = false; } store.set('mtg_sell_sent', JSON.stringify(m)); }
 async function send(rows) {
   const items = rows.map(r => ({ blueprint_id: r.bp, price: r.price, quantity: r.qty, properties: r.props }));
   const res = await Core.sellSend(token(), items, t => { $('msgSend').textContent = t; });

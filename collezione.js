@@ -27,7 +27,10 @@ const idb = (() => {
 })();
 
 const C = { entries: [], cards: {}, it: {}, itSets: [], notFound: [], view: store.get('mtg_col_view') || 'grid', limit: 120, enriching: false };
-const F = { q: '', colors: new Set(), type: '', set: '', rar: '', foil: false, sort: 'name', group: 'none' };
+const SELL = (function () { try { return JSON.parse(localStorage.getItem('mtg_sell_list')) || {}; } catch (e) { return {}; } })();
+const sellN = x => { const s = SELL[x.key]; return s ? (s.n || 0) + (s.f || 0) : 0; };
+function sellSave() { Object.keys(SELL).forEach(k => { const s = SELL[k]; if (!(s.n > 0) && !(s.f > 0)) delete SELL[k]; }); store.set('mtg_sell_list', JSON.stringify(SELL)); }
+const F = { sell: false, q: '', colors: new Set(), type: '', set: '', rar: '', foil: false, sort: 'name', group: 'none' };
 
 const COLOR_IT = { W: 'Bianco', U: 'Blu', B: 'Nero', R: 'Rosso', G: 'Verde', M: 'Multicolore', C: 'Incolore' };
 const COLOR_ORDER = ['W', 'U', 'B', 'R', 'G', 'M', 'C'];
@@ -210,6 +213,7 @@ function buildFilters() {
 function matches(x) {
   const c = cardOf(x);
   if (F.foil && !x.foilQty) return false;
+  if (F.sell && !sellN(x)) return false;
   if (F.set && c.set !== F.set) return false;
   if (F.rar && c.rarity !== F.rar) return false;
   if (F.type && typeCat(c) !== F.type) return false;
@@ -244,10 +248,10 @@ function groupKey(x) {
 function tileHtml(x, i) {
   const c = cardOf(x), nm = esc(nameOf(x));
   if (C.view === 'list') {
-    return `<div class="lrow" data-i="${i}"><span class="q">${x.qty}${x.foilQty ? '<small title="foil"> \u2605</small>' : ''}</span><span class="n">${nm}</span><span class="m">${manaHtml(c.mana)}</span><span class="s">${esc(c.set)}</span><span class="p">${c.eur ? money(priceOf(x) / x.qty) : ''}</span></div>`;
+    return `<div class="lrow" data-i="${i}"><span class="q">${x.qty}${x.foilQty ? '<small title="foil"> \u2605</small>' : ''}${sellN(x) ? '<small title="in vendita"> \u20ac' + sellN(x) + '</small>' : ''}</span><span class="n">${nm}</span><span class="m">${manaHtml(c.mana)}</span><span class="s">${esc(c.set)}</span><span class="p">${c.eur ? money(priceOf(x) / x.qty) : ''}</span></div>`;
   }
   return `<div class="tile" data-i="${i}">${c.img ? `<img loading="lazy" src="${esc(c.img)}" alt="${nm}">` : `<div class="noimg">${nm}</div>`}
-    ${x.qty > 1 ? `<span class="qb">&times;${x.qty}</span>` : ''}${x.foilQty ? '<span class="fb">foil</span>' : ''}<div class="cap">${nm} <small>${esc(c.set)}</small></div></div>`;
+    ${x.qty > 1 ? `<span class="qb">&times;${x.qty}</span>` : ''}${x.foilQty ? '<span class="fb">foil</span>' : ''}${sellN(x) ? '<span class="sb">in vendita &times;' + sellN(x) + '</span>' : ''}<div class="cap">${nm} <small>${esc(c.set)}</small></div></div>`;
 }
 
 let view = [];
@@ -281,11 +285,16 @@ function render() {
 }
 
 // ---------- modale
-function openModal(i) {
-  const x = view[i]; if (!x) return;
+let openX = null;
+function openModal(i) { showModal(view[i]); }
+function showModal(x) {
+  if (!x) return; openX = x;
   const c = cardOf(x);
   const same = items().filter(y => cardOf(y).id === c.id);
-  const prints = same.map(y => `${y.qty} \u00d7 ${esc(cardOf(y).setName)} (${esc(cardOf(y).set)}${cardOf(y).cn ? ' #' + esc(cardOf(y).cn) : ''})${y.foilQty ? ' - di cui ' + y.foilQty + ' foil' : ''}`).join('<br>');
+  const step = (y, f, max) => { const s = SELL[y.key] || {}; const n = s[f] || 0; return `<span class="st"><button class="secondary" data-sell="${esc(y.key)}" data-f="${f}" data-d="-1"${n <= 0 ? ' disabled' : ''}>&minus;</button><b>${n}</b><button class="secondary" data-sell="${esc(y.key)}" data-f="${f}" data-d="1"${n >= max ? ' disabled' : ''}>+</button></span>`; };
+  const prints = same.map(y => { const cc = cardOf(y), nf = y.qty - (y.foilQty || 0);
+    return `<div class="sellrow"><span>${y.qty} \u00d7 ${esc(cc.setName)} (${esc(cc.set)}${cc.cn ? ' #' + esc(cc.cn) : ''})${y.foilQty ? ' - di cui ' + y.foilQty + ' foil' : ''}</span>` +
+      (nf > 0 ? `<span class="st-l">Da vendere ${step(y, 'n', nf)}</span>` : '') + (y.foilQty ? `<span class="st-l">Foil da vendere ${step(y, 'f', y.foilQty)}</span>` : '') + '</div>'; }).join('');
   const it = C.it[c.id];
   const textIt = c.text_it, textEn = c.text;
   $('mBody').innerHTML = `
@@ -298,7 +307,7 @@ function openModal(i) {
       <p class="otext">${esc(textIt || textEn).replace(/\n/g, '<br>')}</p>
       ${textIt && textEn ? `<details><summary>Testo inglese</summary><p class="otext">${esc(textEn).replace(/\n/g, '<br>')}</p></details>` : ''}
       <div class="meta">${esc(c.rarity)}${c.eur ? ' &middot; ' + money(c.eur) : ''}${c.eurFoil ? ' (foil ' + money(c.eurFoil) + ')' : ''}</div>
-      <div class="meta"><b>Ne hai ${same.reduce((a, y) => a + y.qty, 0)}</b><br>${prints}</div>
+      <div class="meta"><b>Ne hai ${same.reduce((a, y) => a + y.qty, 0)}</b></div>${prints}<div class="meta"><a href="vendi.html">Vai alla pagina Vendi</a>${Object.keys(SELL).length ? ' (' + Object.keys(SELL).length + ' righe in lista)' : ''}</div>
     </div>`;
   $('modal').hidden = false; document.body.classList.add('noscroll');
 }
@@ -307,18 +316,21 @@ const closeModal = () => { $('modal').hidden = true; document.body.classList.rem
 // ---------- eventi
 $('csv').onchange = async ev => { const f = ev.target.files[0]; if (!f) return; loadText(await f.text()); };
 $('result').addEventListener('click', ev => { const t = ev.target.closest('[data-i]'); if (t) openModal(+t.dataset.i); });
-$('modal').addEventListener('click', ev => { if (ev.target === $('modal') || ev.target.id === 'mClose') closeModal(); });
+$('modal').addEventListener('click', ev => {
+  const sb = ev.target.closest('[data-sell]');
+  if (sb) { const k = sb.dataset.sell, f = sb.dataset.f, e = C.entries.find(z => z.key === k); if (!e) return; const s = SELL[k] = SELL[k] || {}; const max = f === 'f' ? (e.foilQty || 0) : e.qty - (e.foilQty || 0); s[f] = Math.max(0, Math.min(max, (s[f] || 0) + (+sb.dataset.d))); sellSave(); showModal(openX); render(); return; } if (ev.target === $('modal') || ev.target.id === 'mClose') closeModal(); });
 document.addEventListener('keydown', ev => { if (ev.key === 'Escape') closeModal(); });
 let qTimer = null;
 $('q').oninput = () => { clearTimeout(qTimer); qTimer = setTimeout(() => { F.q = $('q').value.trim(); C.limit = 120; render(); }, 200); };
 $('colors').addEventListener('click', ev => { const ch = ev.target.closest('.chip'); if (!ch) return; const k = ch.dataset.c; F.colors.has(k) ? F.colors.delete(k) : F.colors.add(k); ch.classList.toggle('on'); C.limit = 120; render(); });
 [['fType', 'type'], ['fSet', 'set'], ['fRar', 'rar'], ['fSort', 'sort'], ['fGroup', 'group']].forEach(([id, k]) => { $(id).onchange = () => { F[k] = $(id).value; C.limit = 120; render(); }; });
+$('fSell').onchange = () => { F.sell = $('fSell').checked; C.limit = 120; render(); };
 $('fFoil').onchange = () => { F.foil = $('fFoil').checked; C.limit = 120; render(); };
 document.querySelectorAll('[data-view]').forEach(b => b.onclick = () => { C.view = b.dataset.view; store.set('mtg_col_view', C.view); render(); });
 $('more').onclick = () => { C.limit += 120; render(); };
 $('btnReset').onclick = () => {
-  Object.assign(F, { q: '', type: '', set: '', rar: '', foil: false, sort: 'name', group: 'none' }); F.colors.clear();
-  $('q').value = ''; $('fFoil').checked = false; $('fSort').value = 'name'; $('fGroup').value = 'none'; C.limit = 120; buildFilters(); render();
+  Object.assign(F, { sell: false, q: '', type: '', set: '', rar: '', foil: false, sort: 'name', group: 'none' }); F.colors.clear();
+  $('q').value = ''; $('fFoil').checked = false; $('fSell').checked = false; $('fSort').value = 'name'; $('fGroup').value = 'none'; C.limit = 120; buildFilters(); render();
 };
 $('btnClear').onclick = async () => {
   if (!confirm('Rimuovere la collezione salvata su questo dispositivo? Il file CSV resta dov\u2019\u00e8.')) return;
