@@ -142,6 +142,25 @@
   #peek img { width:100%; border-radius:13px; box-shadow:0 12px 34px rgba(0,0,0,.55); }
   @media (hover:hover) and (min-width:900px) { #peek:not([hidden]) { display:block; } }
 
+  #whoBar[hidden], #oppBox[hidden], .localonly[hidden] { display:none !important; }
+  /* ---- automatismi ---- */
+  .mat .card, #handStrip .card { touch-action:none; -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; }
+  .card.sick img { filter:saturate(.55) brightness(.85); }
+  .card.sick::after { content:"zZ"; position:absolute; left:2px; bottom:2px; font-size:10px; font-weight:700; background:rgba(0,0,0,.75); color:#fff; border-radius:8px; padding:0 4px; }
+  #handStrip .card.afford img { box-shadow:0 0 0 2px #7ed08b, 0 0 12px #7ed08b; }
+  #handStrip .card.noafford img { filter:brightness(.7); }
+  .card.dragging { opacity:.35; }
+  #ghost { position:fixed; z-index:60; pointer-events:none; width:var(--gw,80px); transform:translate(-50%,-60%) rotate(4deg); opacity:.95; filter:drop-shadow(0 8px 14px rgba(0,0,0,.6)); }
+  #ghost img { width:100%; border-radius:6px; display:block; }
+  .drop-on { outline:3px dashed #d9a441 !important; outline-offset:-3px; background:rgba(217,164,65,.14) !important; }
+  #poolBar { display:flex; gap:6px; align-items:center; justify-content:center; font-size:12px; flex-wrap:wrap; }
+  #poolBar .pip { min-width:22px; height:22px; font-size:12px; } #poolBar b { margin-left:2px; font-size:12px; }
+  #manaPick { display:flex; gap:6px; align-items:center; justify-content:center; flex-wrap:wrap; font-size:12.5px; background:rgba(0,0,0,.35); border-radius:10px; padding:4px 8px; }
+  #manaPick[hidden], #poolBar[hidden], #moreActs[hidden] { display:none; }
+  #manaPick .pip { width:30px; height:30px; font-size:14px; border:0; cursor:pointer; }
+  #ticker { font-size:12px; opacity:.9; overflow:hidden; text-overflow:ellipsis; flex:1; min-width:0; }
+  #glog p { margin:2px 0; font-size:13px; } #glog small { color:var(--muted); }
+
   /* ---- Schermata di gioco a tutta altezza, senza scorrere ---- */
   #btnMenu { display:none; }
   #topline { margin-bottom:8px; gap:8px; }
@@ -213,6 +232,11 @@
     </div>
     <div class="row">
       <select id="deckSel" aria-label="Il tuo mazzo"></select>
+      <select id="firstSel" aria-label="Chi inizia">
+        <option value="me">Inizio io</option>
+        <option value="other">Inizia l'altro</option>
+        <option value="rand">Sorteggio (testa o croce)</option>
+      </select>
     </div>
     <div class="row" id="deck2Box" hidden>
       <select id="deck2Sel" aria-label="Mazzo dell'avversario"></select>
@@ -230,7 +254,7 @@
   </section>
 
   <div id="game" hidden>
-    <div class="bar" id="topline"><button class="small" id="btnMenu">&#9776; Menu</button><span class="bar" id="whoBar" hidden><b id="whoName"></b><button class="small" id="btnSwap">Passa all'altro giocatore</button></span></div>
+    <div class="bar" id="topline"><button class="small" id="btnMenu">&#9776; Menu</button><span class="bar" id="whoBar" hidden><b id="whoName"></b><button class="small" id="btnSwap">Passa all'altro giocatore</button></span><span id="ticker" aria-live="polite"></span></div>
     <div class="mat" id="mat">
       <section class="half opp" id="oppBox" hidden>
         <div class="side">
@@ -255,16 +279,24 @@
 
       <div class="mid">
         <div class="phases" id="phases"></div>
+        <div id="poolBar" hidden></div>
+        <div id="manaPick" hidden></div>
         <div class="acts2">
           <span class="turnbox">Turno <b id="turn">1</b></span>
-          <button class="small pri" id="btnTurn">Prossimo turno</button>
+          <button class="small" id="btnNext">Fase successiva</button>
+          <button class="small pri" id="btnTurn">Passa il turno</button>
+          <button class="small" id="btnUndo">Annulla</button>
+          <button class="small" id="btnMore">Altro &#9662;</button>
+        </div>
+        <div class="acts2" id="moreActs" hidden>
           <button class="small" id="btnDraw">Pesca</button>
           <button class="small" id="btnScry">Scruta</button>
           <button class="small" id="btnShuffle">Rimescola</button>
           <button class="small" id="btnMull">Mulligan</button>
           <button class="small" id="btnToken">Gettone</button>
           <button class="small" id="btnProb">Probabilit&#224;</button>
-          <button class="small" id="btnUndo">Annulla</button>
+          <button class="small" id="btnAuto">Mana automatico: s&#236;</button>
+          <button class="small" id="btnClear">Svuota riserva</button>
         </div>
       </div>
 
@@ -301,6 +333,6 @@
 <script src="sync.js?v=3"></script>
 <script src="deckcore.js?v=8"></script>
 <script src="scry.js?v=8"></script>
-<script src="prova.js?v=13"></script>
+<script src="prova.js?v=14"></script>
 </body>
 </html>

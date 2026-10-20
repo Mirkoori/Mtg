@@ -4,16 +4,17 @@ const $ = id => document.getElementById(id);
 const jget = (k, d) => { try { const v = JSON.parse(localStorage.getItem(k)); return v == null ? d : v; } catch (e) { return d; } };
 const DECKS = jget('mtg_decks', []);
 const CARDS = jget('mtg_cards', {});
-const mkP = d => ({ deck: d, name: d.name, lib: [], hand: [], bf: [], gy: [], ex: [], cmd: [], life: 20, pois: 0, turn: 1, phase: 3, log: [], hist: [], uid: 0, mulls: 0 });
+const mkP = d => ({ deck: d, name: d.name, lib: [], hand: [], bf: [], gy: [], ex: [], cmd: [], life: 20, pois: 0, turn: 1, phase: 3, log: [], hist: [], uid: 0, mulls: 0, pool: {}, landsPlayed: 0, tax: {} });
 let PL = [], cur = 0, G = mkP({ name: '' }), mode = 'solo', remote = null, started = false;
 let peer = null, conn = null, syncT = null;
+let GL = [], AFF = new Map(), auto = (function () { try { return localStorage.getItem('mtg_prova_auto') !== '0'; } catch (e) { return true; } })();
 const nm = c => (c.token ? c.name : ((CARDS[c.id] && (CARDS[c.id].name_it || CARDS[c.id].name)) || '?'));
 const data = c => CARDS[c.id] || {};
 let toastT = null;
 function toast(t) { const e = $('toast'); e.textContent = t; e.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => { e.hidden = true; }, 2200); }
-function say(t, P) { P = P || G; P.log.unshift('T' + P.turn + ': ' + t); P.log = P.log.slice(0, 80); }
+function say(t, P) { P = P || G; P.log.unshift('T' + P.turn + ': ' + t); P.log = P.log.slice(0, 80); GL.unshift({ n: P.name, turn: P.turn, t: t, me: PL.length > 1 ? PL.indexOf(P) : 0 }); GL = GL.slice(0, 150); }
 let HIST = [];
-const FIELDS = ['lib', 'hand', 'bf', 'gy', 'ex', 'cmd', 'life', 'pois', 'turn', 'phase', 'uid', 'mulls'];
+const FIELDS = ['lib', 'hand', 'bf', 'gy', 'ex', 'cmd', 'life', 'pois', 'turn', 'phase', 'uid', 'mulls', 'pool', 'landsPlayed', 'tax'];
 function snap() {
   HIST.push(JSON.stringify({ cur: cur, p: PL.map(p => { const o = {}; FIELDS.forEach(k => { o[k] = p[k]; }); return o; }) }));
   if (HIST.length > 80) HIST.shift();
@@ -53,9 +54,16 @@ function start() {
   const d = DECKS.find(x => x.id === $('deckSel').value); if (!d) return;
   const d2 = DECKS.find(x => x.id === $('deck2Sel').value);
   if (!d.cards.some(e => e.section !== 'side')) { $('setupMsg').textContent = 'Il mazzo e vuoto.'; return; }
-  mode = $('modeSel').value; cur = 0;
+  mode = $('modeSel').value; cur = 0; GL = [];
   PL = [build(d)]; if (mode === 'local') { if (!d2) return; PL.push(build(d2)); }
-  G = PL[0]; started = true; HIST = [];
+  // chi inizia: salta la pesca del primo turno (il primo turno e' gia' iniziato, i turni successivi pescano)
+  const first = $('firstSel').value; let meFirst = first !== 'other';
+  if (mode === 'local') { cur = first === 'rand' ? Math.round(Math.random()) : (first === 'other' ? 1 : 0); PL.forEach((x, i) => { x.turn = i === cur ? 1 : 0; }); }
+  else { PL[0].turn = meFirst ? 1 : 0; }
+  G = PL[cur]; started = true; HIST = [];
+  PL.forEach(x => { x.log = []; });
+  GL = []; say('Nuova partita con ' + d.name + (mode === 'local' ? ' contro ' + d2.name : '')); if (mode === 'local') say('Inizia ' + G.name + (first === 'rand' ? ' (sorteggio)' : ''));
+  toast(mode === 'local' ? 'Inizia ' + G.name : (meFirst ? 'Inizi tu: il primo turno non si pesca' : 'Inizia l\'altro: al tuo primo turno pescherai'));
   $('setupMsg').textContent = ''; $('game').hidden = false; $('hand').hidden = false;
   render(); sync();
   $('btnBack').hidden = false; goPlay();
@@ -70,28 +78,137 @@ function mulligan() {
   draw(7, true); say('mulligan ' + G.mulls + ' (tieni 7, poi metti ' + G.mulls + ' in fondo)');
   toast('Mulligan: metti in fondo ' + G.mulls + ' carte dal menu della carta'); render();
 }
+function startTurn() { // inizio del turno del giocatore G: stappa, toglie il malessere da evocazione, svuota il mana, pesca
+  G.turn++; G.phase = 3; G.pool = {}; G.landsPlayed = 0;
+  G.bf.forEach(c => { c.tapped = false; c.sick = false; c.mana = null; });
+  draw(1, true);
+}
 function nextTurn() {
   snap();
   if (mode === 'local' && PL.length > 1) { cur = 1 - cur; G = PL[cur]; } // in due su un dispositivo il turno passa all'altro giocatore
-  G.turn++; G.phase = 3; G.bf.forEach(c => { c.tapped = false; }); draw(1, true);
-  say('nuovo turno, stacca e pesca');
+  startTurn();
+  say('--- Turno ' + G.turn + ': stappa e pesca ---');
   if (mode === 'local' && PL.length > 1) toast('Tocca a ' + G.name);
   render();
 }
-
+function nextPhase() {
+  if (G.phase >= 6) { nextTurn(); return; }
+  snap(); G.phase++; G.pool = {}; say('fase: ' + PHASES[G.phase]); render();
+}
 const pOf = p => (PL[p == null ? cur : p] || G);
 function find(zone, uid, p) { const a = pOf(p)[zone]; const i = a.findIndex(c => c.uid === uid); return { a: a, i: i, c: a[i] }; }
-function moveTo(zone, uid, dest, where, p) {
-  const P = pOf(p); const f = find(zone, uid, p); if (!f.c) return; snap();
+function moveTo(zone, uid, dest, where, p, o) {
+  o = o || {};
+  const P = pOf(p); const f = find(zone, uid, p); if (!f.c) return; if (!o.nosnap) snap();
   f.a.splice(f.i, 1);
   if (f.c.token && dest !== 'bf') { say('gettone ' + f.c.name + ' rimosso', P); render(); return; }
-  f.c.tapped = false; if (dest !== 'bf') f.c.cnt = 0;
+  f.c.tapped = dest === 'bf' ? !!o.tapped : false; f.c.sick = dest === 'bf' ? !!o.sick : false; f.c.mana = null;
+  if (dest !== 'bf') f.c.cnt = 0;
   if (where === 'top') P[dest].unshift(f.c); else P[dest].push(f.c);
-  say(nm(f.c) + ' -> ' + ({ bf: 'campo', hand: 'mano', gy: 'cimitero', ex: 'esilio', lib: 'grimorio', cmd: 'comando' })[dest], P);
+  if (!o.quiet) say(nm(f.c) + ' -> ' + ({ bf: 'campo', hand: 'mano', gy: 'cimitero', ex: 'esilio', lib: 'grimorio', cmd: 'comando' })[dest], P);
   render();
 }
+// ---------- mana
+const MANA_ORDER = ['W', 'U', 'B', 'R', 'G', 'C'];
+function produces(c) { // colori che la carta puo' produrre
+  if (c.token) return [];
+  const d = data(c); let a = (d.produced || []).filter(x => MANA_ORDER.includes(x));
+  if (a.length) return a;
+  const ty = String(d.type || ''), bm = { Plains: 'W', Island: 'U', Swamp: 'B', Mountain: 'R', Forest: 'G' };
+  Object.keys(bm).forEach(k => { if (ty.includes(k) && !a.includes(bm[k])) a.push(bm[k]); });
+  if (a.length) return a;
+  const mm = /\{T\}[^.\n]*?add ([^.\n]+)/i.exec(String(d.text || ''));
+  if (mm) (mm[1].match(/\{([WUBRGC])\}/g) || []).forEach(x => { if (!a.includes(x[1])) a.push(x[1]); });
+  return a;
+}
+const isCreatureC = c => /Creature/.test(String(data(c).type || (c.isCre ? 'Creature' : '')));
+function sources(P) { // permanenti che si possono tappare per fare mana
+  return P.bf.filter(c => !c.tapped && !(isCreatureC(c) && c.sick)).map(c => ({ c: c, opts: produces(c) })).filter(x => x.opts.length);
+}
+function parseCost(m) {
+  const req = []; let gen = 0;
+  String(m || '').split('//')[0].replace(/\{([^}]+)\}/g, (_, s) => {
+    if (/^\d+$/.test(s)) gen += +s;
+    else if (/^[XYZ]$/.test(s)) { /* X = 0 */ }
+    else if (s === 'S') gen += 1;
+    else { const cols = s.split('/').filter(x => MANA_ORDER.includes(x)); if (cols.length) req.push(cols); else gen += 1; }
+    return '';
+  });
+  return { req: req, gen: gen };
+}
+function payPlan(cost, pool, srcs) { // restituisce come pagare (mana in riserva + permanenti da tappare) oppure null
+  const tokens = []; Object.keys(pool).forEach(k => { for (let i = 0; i < pool[k]; i++) tokens.push(k); });
+  const order = srcs.map((x, i) => i).sort((a, b) => srcs[a].opts.length - srcs[b].opts.length);
+  const usedT = tokens.map(() => false), usedS = srcs.map(() => false), asg = [];
+  function rec(i) {
+    if (i === cost.req.length) return true; const r = cost.req[i];
+    for (let t = 0; t < tokens.length; t++) if (!usedT[t] && r.includes(tokens[t])) { usedT[t] = true; asg.push(['t', t, tokens[t]]); if (rec(i + 1)) return true; asg.pop(); usedT[t] = false; }
+    for (const s of order) if (!usedS[s]) { const col = srcs[s].opts.find(o => r.includes(o)); if (col) { usedS[s] = true; asg.push(['s', s, col]); if (rec(i + 1)) return true; asg.pop(); usedS[s] = false; } }
+    return false;
+  }
+  if (!rec(0)) return null;
+  let g = cost.gen;
+  for (let t = 0; t < tokens.length && g > 0; t++) if (!usedT[t]) { usedT[t] = true; asg.push(['t', t, tokens[t]]); g--; }
+  for (const s of order) { if (g <= 0) break; if (!usedS[s]) { usedS[s] = true; asg.push(['s', s, srcs[s].opts[0]]); g--; } }
+  return g > 0 ? null : { asg: asg, tokens: tokens, srcs: srcs };
+}
+function costOf(c, zone, P) {
+  const cost = parseCost(data(c).mana);
+  if (zone === 'cmd') cost.gen += 2 * (P.tax[c.uid] || 0);
+  return cost;
+}
+function manaStr(cost) { return (cost.gen ? '{' + cost.gen + '}' : '') + cost.req.map(r => '{' + r.join('/') + '}').join(''); }
+function addMana(P, col) { P.pool[col] = (P.pool[col] || 0) + 1; }
+function toggleTap(f, P) {
+  const c = f.c; snap();
+  if (c.tapped) { c.tapped = false; if (c.mana) { if (P.pool[c.mana] > 0) P.pool[c.mana]--; c.mana = null; } render(); return; }
+  c.tapped = true;
+  const opts = auto ? produces(c) : [];
+  if (opts.length && isCreatureC(c) && c.sick) { toast(nm(c) + ' ha il malessere da evocazione: niente mana'); }
+  else if (opts.length === 1) { addMana(P, opts[0]); c.mana = opts[0]; }
+  else if (opts.length > 1) { render(); askMana(c, P, opts); return; }
+  else if (G.phase === 4 && isCreatureC(c)) say('attacca con ' + nm(c), P);
+  render();
+}
+function askMana(c, P, opts) {
+  const box = $('manaPick');
+  box.innerHTML = '<span>Che mana fa ' + esc(nm(c)) + '?</span>' + opts.map(o => '<button class="pip p' + o + '" data-mana="' + o + '" data-u="' + c.uid + '">' + o + '</button>').join('') + '<button class="small secondary" data-mana="">Nessuno</button>';
+  box.hidden = false; box.dataset.p = PL.indexOf(P);
+}
+function playCard(zone, uid, p) {
+  const P = pOf(p), f = find(zone, uid, p), c = f.c; if (!c) return;
+  const d = data(c), land = Deck.isLand(d) && !c.token;
+  snap(); let paid = '';
+  if (zone !== 'bf' && !c.token && !land && auto) {
+    const cost = costOf(c, zone, P), plan = payPlan(cost, P.pool, sources(P));
+    if (!plan) {
+      if (!confirm('Mana insufficiente per ' + nm(c) + ' (costo ' + (manaStr(cost).replace(/[{}]/g, '') || '0') + ').\nLa gioco comunque senza pagare?')) { HIST.pop(); return; }
+    } else {
+      const cols = [];
+      plan.asg.forEach(x => { cols.push(x[2]); if (x[0] === 't') P.pool[x[2]]--; else { const sc = plan.srcs[x[1]].c; sc.tapped = true; sc.mana = null; } });
+      Object.keys(P.pool).forEach(k => { if (!P.pool[k]) delete P.pool[k]; });
+      paid = cols.join('');
+    }
+    if (zone === 'cmd') P.tax[c.uid] = (P.tax[c.uid] || 0) + 1;
+  }
+  if (land) { if (P.landsPlayed >= 1) toast('Hai gia giocato una terra in questo turno'); P.landsPlayed++; }
+  const txt = String(d.text || '');
+  const tappedIn = land && /enters (the battlefield )?tapped/i.test(txt) && !/unless|if you control|you may pay/i.test(txt);
+  const sick = !land && isCreatureC(c) && !/\bhaste\b/i.test(txt);
+  say((land ? 'gioca la terra ' : 'lancia ') + nm(c) + (paid ? ' (paga ' + paid + ')' : '') + (tappedIn ? ' (entra tappata)' : ''), P);
+  moveTo(zone, uid, 'bf', undefined, p, { nosnap: true, quiet: true, tapped: tappedIn, sick: sick });
+}
+function computeAff() {
+  AFF = new Map(); if (!auto || (mode === 'online' && false)) return;
+  const srcs = sources(G);
+  G.hand.forEach(c => {
+    const d = data(c); if (c.token) return;
+    if (Deck.isLand(d)) { AFF.set(c.uid, G.landsPlayed < 1); return; }
+    const cost = costOf(c, 'hand', G); AFF.set(c.uid, !!payPlan(cost, G.pool, srcs));
+  });
+}
 function cardHtml(c, zone, p) {
-  const d = data(c); const cls = 'card' + (c.tapped ? ' tapped' : '') + (c.token ? ' token' : '');
+  const d = data(c); const cls = 'card' + (c.tapped ? ' tapped' : '') + (c.token ? ' token' : '') + (zone === 'bf' && c.sick ? ' sick' : '') + (zone === 'hand' && p == null && AFF.has(c.uid) ? (AFF.get(c.uid) ? ' afford' : ' noafford') : '');
   const img = c.token ? '<div class="noimg">' + esc(c.name) + (c.pt ? '<br>' + esc(c.pt) : '') + '</div>' : (d.img ? '<img loading="lazy" src="' + esc(d.img) + '" alt="' + esc(nm(c)) + '">' : '<div class="noimg">' + esc(nm(c)) + '</div>');
   return '<div class="' + cls + '" data-z="' + zone + '" data-u="' + c.uid + '"' + (p != null ? ' data-p="' + p + '"' : '') + '>' + img + (c.cnt ? '<span class="cb">' + (c.cnt > 0 ? '+' : '') + c.cnt + '</span>' : '') + '</div>';
 }
@@ -135,6 +252,7 @@ function render() {
     const d = data(c); const t = c.token ? (c.isCre ? 'c' : 'o') : (Deck.isLand(d) ? 'l' : (/Creature/.test(d.type || '') ? 'c' : 'o'));
     lane[t === 'l' ? 'laneLand' : 'laneCreature'].push(c);
   });
+  computeAff();
   Object.keys(lane).forEach(k => { $(k).innerHTML = lane[k].map(c => cardHtml(c, 'bf')).join(''); });
   $('handStrip').innerHTML = G.hand.map(c => cardHtml(c, 'hand')).join('');
   const seen = lastHand && lastHand.who === G ? lastHand.ids : null;
@@ -148,7 +266,12 @@ function render() {
   $('turn').textContent = G.turn; $('life').textContent = G.life; $('pois').textContent = G.pois;
   $('lifeOrb').classList.toggle('low', G.life <= 5);
   renderPhases();
-  $('log').innerHTML = G.log.map(esc).join('<br>');
+  $('log').innerHTML = GL.map(x => (PL.length > 1 ? '<b>' + esc(x.n) + '</b> ' : '') + '<small>T' + x.turn + '</small> ' + esc(x.t)).join('<br>');
+  const lg = GL[0]; $('ticker').textContent = lg ? (PL.length > 1 ? lg.n + ': ' : '') + lg.t : '';
+  const pk = Object.keys(G.pool).filter(k => G.pool[k] > 0);
+  $('poolBar').hidden = !pk.length; $('poolBar').innerHTML = pk.length ? 'Mana: ' + pk.map(k => '<span class="pip p' + k + '">' + k + '</span><b>' + G.pool[k] + '</b>').join(' ') : '';
+  $('btnAuto').textContent = 'Mana automatico: ' + (auto ? 's\u00ec' : 'no');
+  $('btnTurn').textContent = mode === 'local' ? 'Passa a ' + PL[1 - cur].name : 'Passa il turno';
   $('whoBar').hidden = mode !== 'local'; $('whoName').textContent = 'Sta giocando: ' + G.name + (cur ? ' (giocatore 2)' : ' (giocatore 1)');
   $('handTitle').textContent = mode === 'local' ? 'Mano di ' + G.name : 'Mano';
   renderOpp(); fitMat(); sync();
@@ -292,7 +415,15 @@ document.addEventListener('click', e => {
   if (t.id === 'sheet') { closeSheet(); return; }
   const act = t.closest('#sBody .acts button'); if (act) { cardAct(act.dataset.a); return; }
   const card = t.closest('.card[data-u]');
-  if (card) { cardMenu(card.dataset.z, +card.dataset.u, card.dataset.p != null ? +card.dataset.p : undefined); return; }
+  if (card) {
+    if (suppressClick) return;
+    const z = card.dataset.z, u = +card.dataset.u, pp = card.dataset.p != null ? +card.dataset.p : undefined;
+    if (!t.closest('#sheet') && pp === undefined) {
+      if (z === 'bf') { const f = find('bf', u); if (f.c) toggleTap(f, G); return; }
+      if (z === 'hand') { playCard('hand', u); return; }
+    }
+    cardMenu(z, u, pp); return;
+  }
   const ph = t.closest('[data-phase]'); if (ph) { G.phase = +ph.dataset.phase; say('fase: ' + PHASES[G.phase]); render(); return; }
   const oc = t.closest('[data-ou]');
   if (oc) { const o = oppData(); const z = oc.dataset.oz; const c = o && (o[z] || []).find(x => x.u === +oc.dataset.ou); if (c) oppSheet(c); return; }
@@ -310,10 +441,55 @@ document.addEventListener('click', e => {
   const li = t.closest('[data-life]'); if (li) { snap(); G.life += +li.dataset.life; say('vita ' + G.life); render(); return; }
   const po = t.closest('[data-pois]'); if (po) { snap(); G.pois = Math.max(0, G.pois + +po.dataset.pois); render(); return; }
 });
-document.addEventListener('dblclick', e => {
-  const card = e.target.closest('.card[data-z="bf"]'); if (!card) return;
-  const f = find('bf', +card.dataset.u, card.dataset.p != null ? +card.dataset.p : undefined); if (f.c) { snap(); f.c.tapped = !f.c.tapped; render(); closeSheet(); }
+let suppressClick = false;
+// tasto destro o pressione lunga = scheda della carta con tutte le azioni
+document.addEventListener('contextmenu', e => {
+  const card = e.target.closest('.card[data-u]'); if (!card) return; e.preventDefault();
+  cardMenu(card.dataset.z, +card.dataset.u, card.dataset.p != null ? +card.dataset.p : undefined);
 });
+// trascinamento: dalla mano o dal campo verso campo / cimitero / esilio / grimorio / mano
+(function () {
+  let st = null, ghost = null, lp = null;
+  const zoneAt = (x, y) => {
+    if (ghost) ghost.style.display = 'none'; const el = document.elementFromPoint(x, y); if (ghost) ghost.style.display = '';
+    if (!el) return null;
+    const pile = el.closest('.pile[data-zone]'); if (pile) return { k: ({ library: 'lib', graveyard: 'gy', exile: 'ex', command: 'cmd' })[pile.dataset.zone], el: pile };
+    if (el.closest('#hand')) return { k: 'hand', el: $('hand') };
+    const hf = el.closest('.half.me'); if (hf) return { k: 'bf', el: hf };
+    return null;
+  };
+  const clearHi = () => document.querySelectorAll('.drop-on').forEach(x => x.classList.remove('drop-on'));
+  document.addEventListener('pointerdown', e => {
+    if (e.button > 0 || !started) return;
+    const card = e.target.closest('.card[data-u]'); if (!card || card.closest('#sheet') || card.dataset.p != null) return;
+    if (!card.closest('#mat,#hand')) return; if (card.closest('.half.opp')) return;
+    st = { el: card, z: card.dataset.z, u: +card.dataset.u, x: e.clientX, y: e.clientY, drag: false, id: e.pointerId };
+    clearTimeout(lp); lp = setTimeout(() => { if (st && !st.drag) { const s0 = st; st = null; suppressClick = true; setTimeout(() => { suppressClick = false; }, 400); cardMenu(s0.z, s0.u); } }, 550);
+  });
+  document.addEventListener('pointermove', e => {
+    if (!st || e.pointerId !== st.id) return;
+    if (!st.drag) {
+      if (Math.hypot(e.clientX - st.x, e.clientY - st.y) < 9) return;
+      st.drag = true; clearTimeout(lp);
+      ghost = document.createElement('div'); ghost.id = 'ghost'; ghost.style.setProperty('--gw', st.el.getBoundingClientRect().width + 'px');
+      const im = st.el.querySelector('img'); ghost.innerHTML = im ? '<img src="' + im.src + '" alt="">' : '<div class="noimg">' + st.el.textContent + '</div>';
+      document.body.appendChild(ghost); st.el.classList.add('dragging');
+    }
+    e.preventDefault(); ghost.style.left = e.clientX + 'px'; ghost.style.top = e.clientY + 'px';
+    clearHi(); const z = zoneAt(e.clientX, e.clientY); if (z && !(z.k === 'bf' && st.z === 'bf') && z.k !== st.z) z.el.classList.add('drop-on');
+  }, { passive: false });
+  const end = e => {
+    clearTimeout(lp); if (!st || (e.pointerId !== undefined && e.pointerId !== st.id)) return;
+    const s0 = st; st = null; if (!s0.drag) return;
+    suppressClick = true; setTimeout(() => { suppressClick = false; }, 350);
+    const z = e.type === 'pointerup' ? zoneAt(e.clientX, e.clientY) : null;
+    clearHi(); if (ghost) { ghost.remove(); ghost = null; } s0.el.classList.remove('dragging');
+    if (!z || z.k === s0.z) { render(); return; }
+    if (z.k === 'bf') { if (s0.z === 'hand') playCard('hand', s0.u); else render(); return; }
+    moveTo(s0.z, s0.u, z.k, z.k === 'lib' ? 'top' : undefined);
+  };
+  document.addEventListener('pointerup', end); document.addEventListener('pointercancel', end);
+})();
 $('btnStart').onclick = start;
 $('btnDraw').onclick = () => { snap(); draw(1); render(); };
 $('btnShuffle').onclick = () => { snap(); shuffle(G.lib); say('rimescola'); toast('Grimorio rimescolato'); render(); };
@@ -322,6 +498,15 @@ $('btnScry').onclick = scryTop;
 $('btnToken').onclick = addToken;
 $('btnProb').onclick = probs;
 $('btnTurn').onclick = nextTurn;
+$('btnNext').onclick = nextPhase;
+$('btnMore').onclick = () => { const m = $('moreActs'); m.hidden = !m.hidden; $('btnMore').innerHTML = m.hidden ? 'Altro &#9662;' : 'Altro &#9652;'; fitMat(); };
+$('btnAuto').onclick = () => { auto = !auto; try { localStorage.setItem('mtg_prova_auto', auto ? '1' : '0'); } catch (e) {} render(); toast(auto ? 'Mana automatico attivo: le terre fanno mana quando le tocchi' : 'Mana automatico spento: muovi le carte a mano'); };
+$('btnClear').onclick = () => { snap(); G.pool = {}; G.bf.forEach(c => { c.mana = null; }); render(); };
+$('manaPick').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return; const box = $('manaPick'); const P = PL[+box.dataset.p] || G;
+  if (b.dataset.mana) { const c = P.bf.find(x => x.uid === +b.dataset.u); if (c) { addMana(P, b.dataset.mana); c.mana = b.dataset.mana; } }
+  box.hidden = true; render();
+});
 $('btnUndo').onclick = undo;
 window.addEventListener('resize', () => { if (started) { fitMat(); fanHand(); } });
 $('btnMenu').onclick = () => { document.body.classList.remove('playing'); render(); window.scrollTo(0, 0); };
