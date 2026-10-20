@@ -251,7 +251,7 @@ function tileHtml(x, i) {
     return `<div class="lrow" data-i="${i}"><span class="q">${x.qty}${x.foilQty ? '<small title="foil"> \u2605</small>' : ''}${sellN(x) ? '<small title="in vendita"> \u20ac' + sellN(x) + '</small>' : ''}</span><span class="n">${nm}</span><span class="m">${manaHtml(c.mana)}</span><span class="s">${esc(c.set)}</span><span class="p">${c.eur ? money(priceOf(x) / x.qty) : ''}</span></div>`;
   }
   return `<div class="tile" data-i="${i}">${c.img ? `<img loading="lazy" src="${esc(c.img)}" alt="${nm}">` : `<div class="noimg">${nm}</div>`}
-    ${x.qty > 1 ? `<span class="qb">&times;${x.qty}</span>` : ''}${x.foilQty ? '<span class="fb">foil</span>' : ''}${sellN(x) ? '<span class="sb">in vendita &times;' + sellN(x) + '</span>' : ''}<div class="cap">${nm} <small>${esc(c.set)}</small></div></div>`;
+    ${x.qty > 1 ? `<span class="qb">&times;${x.qty}</span>` : ''}${x.foilQty ? '<span class="fb">foil</span>' : ''}${sellN(x) ? '<span class="sb">in vendita &times;' + sellN(x) + '</span>' : ''}<div class="cap">${nm} <small>${esc(c.set)}</small></div>${c.eur || c.eurFoil ? '<div class="pz">' + money(priceOf(x) / x.qty) + (x.qty > 1 ? ' <small>cad.</small>' : '') + '</div>' : '<div class="pz"><small>prezzo n.d.</small></div>'}</div>`;
 }
 
 let view = [];
