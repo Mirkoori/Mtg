@@ -534,7 +534,7 @@ $('btnRename').onclick = () => { const d = deck(); if (!d) return; const n = pro
 $('btnDup').onclick = () => { const d = deck(); if (!d) return; const c = JSON.parse(JSON.stringify(d)); c.id = 'd' + Date.now().toString(36); c.name = d.name + ' (copia)'; S.decks.push(c); S.cur = c.id; save(); render(); };
 $('btnDel').onclick = () => { const d = deck(); if (!d) return; if (!confirm(`Eliminare il mazzo "${d.name}"?`)) return; S.decks = S.decks.filter(x => x.id !== d.id); S.cur = S.decks.length ? S.decks[0].id : ''; save(); render(); };
 $('btnExport').onclick = () => {
-  const d = deck(); if (!d) return; const txt = Deck.exportText(d, S.cards);
+  const d = deck(); if (!d) return; let txt = Deck.exportText(d, S.cards);
   const canShare = !!navigator.share;
   $('mBody').innerHTML = `<div class="minfo" style="flex:1 1 100%"><h3>Esporta &laquo;${esc(d.name)}&raquo;</h3>
     <div class="msg">Lista con i nomi inglesi, nel formato di Arena, Moxfield, Archidekt e simili.</div>
@@ -544,6 +544,20 @@ $('btnExport').onclick = () => {
   $('modal').hidden = false; document.body.classList.add('noscroll');
   const ta = $('exTxt'); ta.onfocus = () => ta.select();
   $('exCopy').onclick = () => copyText(txt, 'Lista copiata');
+  // Arena non accetta carte esistenti solo in cartaceo: le riconosco e le tolgo dalla lista
+  (async () => {
+    try {
+      const es = (d.cards || []).filter(e => S.cards[e.id] && S.cards[e.id].sid); const ids = [...new Set(es.map(e => S.cards[e.id].sid))]; const games = {};
+      for (let i = 0; i < ids.length; i += 75) { const r = await scry('/cards/collection', { identifiers: ids.slice(i, i + 75).map(id => ({ id })) }); (r.data || []).forEach(c => { games[c.id] = c.games || []; }); }
+      const miss = es.filter(e => games[S.cards[e.id].sid] && games[S.cards[e.id].sid].indexOf('arena') < 0);
+      const skip = new Set();
+      for (const e of miss) { const r = await scry('/cards/search?q=' + encodeURIComponent('!"' + S.cards[e.id].name.replace(/"/g, '') + '" game:arena')); if (!(r.data && r.data.length)) skip.add(e.id); }
+      if (!skip.size || !$('exTxt')) return;
+      txt = Deck.exportText(d, S.cards, skip); $('exTxt').value = txt;
+      const names = [...skip].map(id => S.cards[id].name_it || S.cards[id].name);
+      $('exTxt').insertAdjacentHTML('beforebegin', '<div class="msg" style="color:var(--warn);margin-top:6px">Tolte dalla lista perch\u00e9 non esistono su Arena: <b>' + names.map(esc).join(', ') + '</b>. Il mazzo su Arena avr\u00e0 meno carte.</div>');
+    } catch (e) { /* senza connessione resta la lista completa */ }
+  })();
   $('exFile').onclick = () => { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([txt], { type: 'text/plain' })); a.download = (d.name || 'mazzo').replace(/[^\w\- ]+/g, '').trim().replace(/\s+/g, '_') + '.txt'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 2000); };
   if ($('exShare')) $('exShare').onclick = () => { navigator.share({ title: d.name, text: txt }).catch(() => {}); };
 };

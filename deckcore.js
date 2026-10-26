@@ -172,8 +172,8 @@ const Deck = (() => {
   }
 
   // Esporta in testo (nomi inglesi, accettato da Moxfield, Archidekt, ecc.)
-  function exportText(deck, cards) {
-    const line = e => { const c = cards[e.id]; return c ? `${e.qty} ${c.name}` : null; };
+  function exportText(deck, cards, skip) {
+    const line = e => { const c = cards[e.id]; return c && !(skip && skip.has(e.id)) ? `${e.qty} ${c.name}` : null; };
     const out = [];
     const cm = entries(deck, 'commander').map(line).filter(Boolean);
     if (cm.length) { out.push('Commander'); out.push(...cm); out.push(''); }
