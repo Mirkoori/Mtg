@@ -44,8 +44,12 @@
   .set { width:200px; border-radius:16px; padding:14px; background:linear-gradient(160deg,#4b3622,#2a1b0e); border:1px solid #8a6a3a; box-shadow:0 5px 14px rgba(0,0,0,.55); text-decoration:none; }
   .set img { width:38px; height:38px; filter:invert(.9) sepia(.5) saturate(2.2) hue-rotate(-12deg); display:block; }
   .set b { display:block; margin-top:9px; font-family:Georgia,serif; font-size:16px; line-height:1.2; color:#f6ead0; }
+  .evc .cd { display:inline-block; margin-top:8px; padding:1px 10px; border-radius:999px; background:#e6b857; color:#2a1a0a; font-weight:800; font-size:12px; }
   .set .d { margin-top:6px; font-size:12.5px; color:#d9c39a; } .set .cd { display:inline-block; margin-top:8px; padding:1px 10px; border-radius:999px; background:#e6b857; color:#2a1a0a; font-weight:800; font-size:12px; }
   .set .cd.past { background:#3a2a18; color:#d9c39a; }
+  .evc { width:210px; border-radius:16px; padding:13px; background:linear-gradient(160deg,#4b3622,#2a1b0e); border:1px solid #8a6a3a; box-shadow:0 5px 14px rgba(0,0,0,.55); text-decoration:none; }
+  .evc .dd { font-size:12px; letter-spacing:.07em; text-transform:uppercase; color:#d9c39a; } .evc b { display:block; margin:4px 0; font-family:Georgia,serif; font-size:16px; line-height:1.2; color:#f6ead0; } .evc .pl { font-size:12.5px; color:#d9c39a; }
+  .evc.cta { display:grid; align-content:center; text-align:center; border-style:dashed; color:#e6b857; font-weight:700; background:#1c130b; }
   .empty { margin:16px; padding:18px; border:1px dashed #7a5c36; border-radius:14px; text-align:center; color:var(--muted); }
   .empty a { color:#e6b857; font-weight:700; }
   .note { padding:0 16px; color:#9c8460; font-size:12px; margin-top:6px; }
@@ -69,12 +73,18 @@
     <a class="pill" href="prova.html"><svg viewBox="0 0 24 24"><path d="M7 5l10 14M17 5 7 19"/></svg>Prova una mano</a>
     <a class="pill" href="collezione.html?sell=1"><svg viewBox="0 0 24 24"><path d="M4 6h2.2l2 9.5h9.3L19 9H7.2"/></svg>Da vendere <small id="nSell" hidden></small></a>
     <a class="pill" href="collezione.html?many=1"><svg viewBox="0 0 24 24"><rect x="4" y="5" width="11" height="15" rx="1.8"/></svg>Pi&ugrave; di 4 uguali</a>
+    <a class="pill" href="eventi.html"><svg viewBox="0 0 24 24"><rect x="4" y="5.5" width="16" height="14" rx="2"/><path d="M4 10h16M8.5 3.5v4M15.5 3.5v4"/></svg>Eventi</a>
     <a class="pill" href="carrello.html"><svg viewBox="0 0 24 24"><circle cx="9.5" cy="19" r="1.4"/><circle cx="16.5" cy="19" r="1.4"/><path d="M4 6h2.2l2 9.5h9.3L19 9H7.2"/></svg>Carrello CardTrader</a>
   </div>
 
   <section class="blk" id="decksBlk">
     <div class="bh"><h2>I tuoi mazzi</h2><a href="mazzi.html">Apri</a></div>
     <div class="rail" id="decks"></div>
+  </section>
+
+  <section class="blk" id="evBlk">
+    <div class="bh"><h2>Eventi e negozi</h2><a href="eventi.html">Apri</a></div>
+    <div class="rail" id="evRail"></div>
   </section>
 
   <section class="blk dark" id="topBlk" hidden>
@@ -94,10 +104,10 @@
   </section>
 </main>
 <div id="toast" hidden></div>
-<script src="nav.js?v=1"></script>
+<script src="nav.js?v=2"></script>
 <script src="config.js?v=2"></script>
-<script src="sync.js?v=6"></script>
+<script src="sync.js?v=7"></script>
 <script src="scry.js?v=8"></script>
-<script src="home.js?v=1"></script>
+<script src="home.js?v=2"></script>
 </body>
 </html>

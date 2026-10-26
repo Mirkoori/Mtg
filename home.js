@@ -74,4 +74,11 @@ async function loadNews() {
     if (!c) { $('sets').innerHTML = '<div class="empty">Novit&agrave; non disponibili ora. Riprova pi&ugrave; tardi.</div>'; $('spoil').innerHTML = ''; $('spoilBlk').hidden = true; }
   }
 }
-greeting(); renderDecks(); renderCollection(); loadNews();
+function renderEvents() {
+  const today = new Date().toISOString().slice(0, 10), now = new Date(today + 'T12:00:00');
+  const up = jget('mtg_events', []).filter(e => e.date >= today).sort((a, b) => a.date.localeCompare(b.date)).slice(0, 5);
+  const card = e => { const d = Math.round((new Date(e.date + 'T12:00:00') - now) / 86400000), dt = new Date(e.date + 'T12:00:00').toLocaleDateString('it-IT', { weekday: 'short', day: 'numeric', month: 'long' });
+    return '<a class="evc" href="eventi.html"><div class="dd">' + dt + '</div><b>' + esc(e.title) + '</b><div class="pl">' + esc(e.place || e.type || '') + '</div><span class="cd">' + (d === 0 ? 'oggi' : d === 1 ? 'domani' : 'tra ' + d + ' giorni') + '</span></a>'; };
+  $('evRail').innerHTML = up.map(card).join('') + '<a class="evc cta" href="eventi.html"><div>' + (up.length ? '+ Aggiungi evento' : 'Aggiungi una fiera<br>o trova i negozi<br>vicino a te') + '</div></a>';
+}
+greeting(); renderEvents(); renderDecks(); renderCollection(); loadNews();

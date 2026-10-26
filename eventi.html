@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#070605">
+<title>Eventi e negozi</title>
+<style>
+  :root { --bg:#070605; --card:#43301f; --ink:#f3e7cc; --muted:#c3aa80; --line:#7a5c36; --accent:#d9a441; --accent-ink:#2a1a0a; --bad:#f2837b; --ok:#8fdba6; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:#070605; color:var(--ink); font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; }
+  main { max-width:900px; margin:0 auto; padding:14px 12px 30px; }
+  h1 { font-size:24px; margin:4px 0 4px; } h2 { font-size:18px; margin:0 0 10px; font-family:Georgia,serif; }
+  .lead { color:var(--muted); margin:0 0 14px; }
+  .panel { margin-bottom:14px; padding:14px; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:10px; }
+  label.f { display:block; font-size:12.5px; color:var(--muted); } label.f > input, label.f > select, label.f > textarea { margin-top:3px; width:100%; padding:9px 10px; border-radius:8px; font:inherit; font-size:16px; border:1px solid #7a5c36; }
+  .row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-top:10px; }
+  button { font:inherit; padding:8px 14px; border-radius:8px; border:1px solid #b98727; cursor:pointer; font-weight:700; }
+  .msg { color:var(--muted); font-size:13.5px; } .err { color:var(--bad); }
+  .ev { display:grid; grid-template-columns:62px 1fr auto; gap:12px; align-items:center; padding:10px 0; border-bottom:1px solid #5a4226; }
+  .ev:last-child { border-bottom:0; }
+  .dt { text-align:center; background:#1c130b; border:1px solid #8a6a3a; border-radius:10px; padding:5px 2px; line-height:1.15; } .dt b { display:block; font-family:Georgia,serif; font-size:22px; color:#f6ead0; } .dt span { font-size:11px; text-transform:uppercase; letter-spacing:.08em; color:var(--muted); }
+  .ev .t { font-weight:700; } .ev .s { font-size:13px; color:var(--muted); }
+  .cd { display:inline-block; padding:0 9px; border-radius:999px; background:#e6b857; color:#2a1a0a; font-weight:800; font-size:12px; margin-left:6px; }
+  .tag { display:inline-block; font-size:11px; padding:0 8px; border-radius:999px; border:1px solid #8a6a3a; color:#e6bd6a; margin-right:4px; }
+  .shop { display:flex; gap:10px; padding:10px 0; border-bottom:1px solid #5a4226; align-items:flex-start; } .shop:last-child { border-bottom:0; }
+  .shop .km { flex:none; min-width:58px; text-align:center; background:#1c130b; border:1px solid #8a6a3a; border-radius:10px; padding:5px 4px; font-weight:800; color:#f6ead0; font-size:15px; }
+  .shop .km small { display:block; font-weight:400; font-size:10.5px; color:var(--muted); }
+  .shop a { color:#e6bd6a; }
+  .links a { display:block; padding:9px 0; border-bottom:1px solid #5a4226; color:#e6bd6a; text-decoration:none; font-weight:600; } .links a small { display:block; color:var(--muted); font-weight:400; }
+  .links a:last-child { border-bottom:0; }
+  .rec { display:flex; gap:10px; align-items:center; justify-content:space-between; padding:9px 0; border-bottom:1px solid #5a4226; } .rec:last-child { border-bottom:0; }
+  #toast { position:fixed; left:50%; bottom:78px; transform:translateX(-50%); background:#222; color:#fff; padding:9px 16px; border-radius:20px; font-size:14px; z-index:30; }
+  details summary { cursor:pointer; color:var(--muted); font-size:13.5px; }
+</style>
+<link rel="stylesheet" href="theme.css?v=5">
+</head>
+<body>
+<main>
+  <h1>Eventi e negozi</h1>
+  <p class="lead">Fiere, tornei e serate di scambio, e i negozi di carte vicino a te.</p>
+
+  <section class="panel">
+    <h2>I miei eventi</h2>
+    <div id="evList"></div>
+    <details id="pastBox" hidden><summary id="pastSum"></summary><div id="pastList"></div></details>
+    <details id="addBox" style="margin-top:8px"><summary><b>+ Aggiungi un evento</b></summary>
+      <div class="grid" style="margin-top:10px">
+        <label class="f">Nome<input type="text" id="eTitle" placeholder="es. Fiera del fumetto" autocomplete="off"></label>
+        <label class="f">Data<input type="date" id="eDate"></label>
+        <label class="f">Ora (facoltativa)<input type="time" id="eTime"></label>
+        <label class="f">Tipo<select id="eType"><option>Fiera</option><option>Torneo</option><option>Scambio</option><option>Serata</option><option>Altro</option></select></label>
+        <label class="f">Luogo<input type="text" id="ePlace" placeholder="es. ModenaFiere, Modena" autocomplete="off"></label>
+        <label class="f">Link (facoltativo)<input type="text" id="eLink" placeholder="https://..." autocomplete="off"></label>
+      </div>
+      <div class="row"><button id="eSave">Salva evento</button><span class="msg" id="eMsg"></span></div>
+    </details>
+  </section>
+
+  <section class="panel">
+    <h2>Da seguire</h2>
+    <div class="msg" style="margin-bottom:6px">Appuntamenti che tornano ogni anno. Le date cambiano: controllale sul sito ufficiale e poi aggiungile ai tuoi eventi.</div>
+    <div id="recs"></div>
+  </section>
+
+  <section class="panel">
+    <h2>Cosa porto da scambiare</h2>
+    <div class="msg">Prima di andare a una fiera guarda cosa hai in pi&ugrave;.</div>
+    <div class="row"><a href="collezione.html?many=1"><button class="secondary" style="background:transparent;color:#e6bd6a">Pi&ugrave; di 4 uguali</button></a><a href="collezione.html?sell=1"><button class="secondary" style="background:transparent;color:#e6bd6a">Le carte da vendere</button></a></div>
+  </section>
+
+  <section class="panel">
+    <h2>Negozi vicino a te</h2>
+    <div class="grid">
+      <label class="f">Citt&agrave; o indirizzo<input type="text" id="pCity" placeholder="es. Modena" autocomplete="off"></label>
+      <label class="f">Raggio<select id="pKm"><option value="10">10 km</option><option value="25" selected>25 km</option><option value="50">50 km</option><option value="100">100 km</option></select></label>
+    </div>
+    <div class="row"><button id="pFind">Cerca</button><button id="pGeo" class="secondary" style="background:transparent;color:#e6bd6a">Usa la mia posizione</button></div>
+    <div class="msg" id="pMsg" style="margin-top:8px"></div>
+    <div id="shops"></div>
+    <div class="msg" style="margin-top:8px">Dati di OpenStreetMap, inseriti da volontari: qualche negozio pu&ograve; mancare o essere chiuso. Controlla gli orari prima di andare.</div>
+  </section>
+
+  <section class="panel">
+    <h2>Dove cercare</h2>
+    <div class="links">
+      <a href="https://locator.wizards.com/" target="_blank" rel="noopener">Cerca eventi ufficiali di Wizards<small>Trova i negozi che organizzano tornei e draft</small></a>
+      <a href="https://www.eventiesagre.it/" target="_blank" rel="noopener">Eventi e sagre in Italia<small>Fiere e mercatini per regione</small></a>
+      <a href="https://www.facebook.com/search/groups/?q=magic%20the%20gathering%20scambio%20modena" target="_blank" rel="noopener">Gruppi di scambio su Facebook<small>Cerca il gruppo della tua citt&agrave;</small></a>
+    </div>
+  </section>
+</main>
+<div id="toast" hidden></div>
+<script src="nav.js?v=2"></script>
+<script src="config.js?v=2"></script>
+<script src="sync.js?v=7"></script>
+<script src="scry.js?v=8"></script>
+<script src="eventi.js?v=1"></script>
+</body>
+</html>

@@ -9,7 +9,7 @@
     shop: '<path d="M4 6h2.2l2 9.5h9.3L19 9H7.2"/><circle cx="9.5" cy="19" r="1.4"/><circle cx="16.5" cy="19" r="1.4"/>'
   };
   var T = [
-    { h: 'index.html', l: 'Home', i: 'home', m: ['index.html', ''] },
+    { h: 'index.html', l: 'Home', i: 'home', m: ['index.html', '', 'eventi.html'] },
     { h: 'collezione.html', l: 'Collezione', i: 'col', m: ['collezione.html'] },
     { h: 'mazzi.html', l: 'Mazzi', i: 'deck', m: ['mazzi.html'] },
     { h: 'prova.html', l: 'Prova', i: 'play', m: ['prova.html'] },
