@@ -184,6 +184,19 @@ const Deck = (() => {
     return out.join('\n');
   }
 
+  // Carte che servono in piu' mazzi ma di cui non hai abbastanza copie (terre base escluse).
+  // owned: { 'nome minuscolo': copie possedute }. Restituisce [{ name, need, have, decks: [{ id, name, qty }] }]
+  function conflicts(decks, cards, owned) {
+    if (!owned || !Object.keys(owned).length) return [];
+    const by = {};
+    (decks || []).forEach(d => (d.cards || []).forEach(e => {
+      const c = cards[e.id]; if (!c || isBasic(c) || e.section === 'side') return;
+      const k = String(c.name).toLowerCase(), o = by[k] = by[k] || { name: c.name, need: 0, decks: [] };
+      o.need += e.qty; const x = o.decks.find(z => z.id === d.id); if (x) x.qty += e.qty; else o.decks.push({ id: d.id, name: d.name, qty: e.qty });
+    }));
+    return Object.keys(by).map(k => Object.assign(by[k], { have: owned[k] || 0 })).filter(o => o.decks.length > 1 && o.have > 0 && o.need > o.have).sort((a, b) => (b.need - b.have) - (a.need - a.have) || a.name.localeCompare(b.name));
+  }
+
   // Legge un elenco testuale: "4 Nome", "4x Nome", "Nome", "Nome (SET) 12", con sezioni Commander/Sideboard
   function parseList(text) {
     const res = []; let mode = 'main';
@@ -235,6 +248,6 @@ const Deck = (() => {
 
   const TYPE_EN_IT = {}; Object.entries(TYPE_IT).forEach(([it, en]) => { if (!(en in TYPE_EN_IT)) TYPE_EN_IT[en] = it; });
   function typeIt(en) { const k = TYPE_EN_IT[String(en || '').toLowerCase()]; return k ? k.charAt(0).toUpperCase() + k.slice(1) : en; }
-  return { typeIt, typeWordsEn, SECTIONS, MAIN, FORMATS, classify, emptyDeck, entries, count, mainCount, addCard, setQty, moveCard, stats, check, exportText, parseList, colorPips, isLand, isBasic };
+  return { typeIt, typeWordsEn, SECTIONS, MAIN, FORMATS, classify, emptyDeck, entries, count, mainCount, addCard, setQty, moveCard, stats, check, exportText, parseList, conflicts, colorPips, isLand, isBasic };
 })();
 if (typeof module !== 'undefined') module.exports = Deck;

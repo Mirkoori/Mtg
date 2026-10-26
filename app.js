@@ -392,3 +392,11 @@ $('btnAdd').onclick = async () => {
   addTotals = { ok: 0, rows: sel.length };
   runAdd(sel, false);
 };
+
+// ---- arrivo da Mazzi ("Compra le mancanti"): lista gia' pronta
+(function () {
+  const t = store.get('mtg_cart_prefill'); if (!t) return;
+  store.del('mtg_cart_prefill');
+  const r = document.querySelector('input[name=mode][value=list]'); if (!r) return;
+  r.checked = true; $('listText').value = t; setMode(); updateListInfo('Lista dal tuo mazzo: connettiti con il token e premi Anteprima.');
+})();

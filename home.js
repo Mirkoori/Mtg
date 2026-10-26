@@ -81,4 +81,9 @@ function renderEvents() {
     return '<a class="evc" href="eventi.html"><div class="dd">' + dt + '</div><b>' + esc(e.title) + '</b><div class="pl">' + esc(e.place || e.type || '') + '</div><span class="cd">' + (d === 0 ? 'oggi' : d === 1 ? 'domani' : 'tra ' + d + ' giorni') + '</span></a>'; };
   $('evRail').innerHTML = up.map(card).join('') + '<a class="evc cta" href="eventi.html"><div>' + (up.length ? '+ Aggiungi evento' : 'Aggiungi una fiera<br>o trova i negozi<br>vicino a te') + '</div></a>';
 }
-greeting(); renderEvents(); renderDecks(); renderCollection(); loadNews();
+function renderConflicts() {
+  const cf = Deck.conflicts(jget('mtg_decks', []), jget('mtg_cards', {}), jget('mtg_owned', {}));
+  if (!cf.length) return; const b = $('conflBar'); b.hidden = false;
+  b.textContent = cf.length + (cf.length === 1 ? ' carta serve' : ' carte servono') + ' in pi\u00f9 mazzi ma non ne hai abbastanza (es. ' + cf[0].name + '). Tocca per vedere.';
+}
+greeting(); renderConflicts(); renderEvents(); renderDecks(); renderCollection(); loadNews();

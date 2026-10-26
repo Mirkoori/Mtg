@@ -103,8 +103,11 @@ function renderSummary(d) {
   const hasOwned = Object.keys(S.owned).length > 0;
   let h = `<div class="big"><b>${st.main}</b> / ${st.mainTarget} carte${esc(cmdr)}${f.side ? ` &middot; sideboard ${st.side}/${f.side}` : ''}</div>`;
   h += `<div class="sub2">${esc(f.name)} &middot; costo medio ${st.avgCmc.toFixed(1)}${st.value ? ' &middot; circa ' + st.value.toLocaleString('it-IT', { style: 'currency', currency: 'EUR' }) : ''}</div>`;
-  if (hasOwned) h += `<div class="sub2">Hai gi\u00e0 ${ownedHave} carte su ${ownedTot} (escluse le terre base). <button class="link" id="btnMissing">Copia le mancanti</button></div>`;
-  else h += `<div class="sub2">Carica il tuo file CSV nella pagina Carrello per vedere quali carte hai gi\u00e0.</div>`;
+  if (hasOwned) h += `<div class="sub2">Hai gi\u00e0 ${ownedHave} carte su ${ownedTot} (escluse le terre base). <button class="link" id="btnMissing">Copia le mancanti</button>${missing > 0 ? ` \u00b7 <button class="link" id="btnBuy">Compra le mancanti (${missing})</button>` : ''}</div>`;
+  else h += `<div class="sub2">Carica il tuo file CSV nella pagina Collezione per vedere quali carte hai gi\u00e0.</div>`;
+  const cf = Deck.conflicts(S.decks, S.cards, S.owned).filter(o => o.decks.some(x => x.id === d.id));
+  if (cf.length) h += `<details class="sub2" style="margin-top:6px"><summary style="cursor:pointer;color:var(--warn)">${cf.length} ${cf.length === 1 ? 'carta serve' : 'carte servono'} anche in altri mazzi ma non ne hai abbastanza</summary>` +
+    cf.map(o => `<div class="msg">${esc(o.name)}: ne servono ${o.need} (${o.decks.map(x => esc(x.name) + ' ' + x.qty).join(', ')}), ne hai ${o.have}</div>`).join('') + '</details>';
   h += '<div class="bars">';
   Deck.MAIN.forEach(s => {
     const x = st.sections[s], [mn, id, mx] = x.range;
@@ -124,6 +127,7 @@ function renderSummary(d) {
   else if (st.main === st.mainTarget) h += '<ul class="warns"><li class="ok">Nessun problema trovato.</li></ul>';
   $('summary').innerHTML = h;
   const bm = $('btnMissing'); if (bm) bm.onclick = () => copyText(missingText(d), 'Elenco copiato');
+  const bb = $('btnBuy'); if (bb) bb.onclick = () => { store.set('mtg_cart_prefill', missingText(d)); location.href = 'carrello.html'; };
 }
 
 function missingText(d) {
