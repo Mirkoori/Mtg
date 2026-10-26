@@ -529,7 +529,20 @@ $('createForm').onsubmit = ev => { ev.preventDefault(); newDeck($('newName').val
 $('btnRename').onclick = () => { const d = deck(); if (!d) return; const n = prompt('Nuovo nome del mazzo', d.name); if (n && n.trim()) { d.name = n.trim(); save(); render(); } };
 $('btnDup').onclick = () => { const d = deck(); if (!d) return; const c = JSON.parse(JSON.stringify(d)); c.id = 'd' + Date.now().toString(36); c.name = d.name + ' (copia)'; S.decks.push(c); S.cur = c.id; save(); render(); };
 $('btnDel').onclick = () => { const d = deck(); if (!d) return; if (!confirm(`Eliminare il mazzo "${d.name}"?`)) return; S.decks = S.decks.filter(x => x.id !== d.id); S.cur = S.decks.length ? S.decks[0].id : ''; save(); render(); };
-$('btnExport').onclick = () => { const d = deck(); if (d) copyText(Deck.exportText(d, S.cards), 'Lista copiata (nomi inglesi, pronta per Moxfield)'); };
+$('btnExport').onclick = () => {
+  const d = deck(); if (!d) return; const txt = Deck.exportText(d, S.cards);
+  const canShare = !!navigator.share;
+  $('mBody').innerHTML = `<div class="minfo" style="flex:1 1 100%"><h3>Esporta &laquo;${esc(d.name)}&raquo;</h3>
+    <div class="msg">Lista con i nomi inglesi, nel formato di Arena, Moxfield, Archidekt e simili.</div>
+    <textarea id="exTxt" readonly rows="12" style="width:100%;margin-top:8px;font:13px/1.4 ui-monospace,Menlo,Consolas,monospace;padding:8px;border-radius:8px">${esc(txt)}</textarea>
+    <div class="row" style="margin-top:8px"><button id="exCopy">Copia</button><button id="exFile" class="secondary">Scarica .txt</button>${canShare ? '<button id="exShare" class="secondary">Condividi</button>' : ''}</div>
+    <details style="margin-top:10px"><summary>Come importarla in Arena</summary><div class="msg" style="margin-top:6px">Copia la lista, poi in Arena apri <b>Mazzi</b> e premi <b>Importa</b> (in basso a sinistra): il mazzo compare come &laquo;Imported Deck&raquo;.<br>Questo passaggio &egrave; descritto per la versione per computer; non ho trovato conferma che ci sia anche da telefono. Se da telefono non vedi il pulsante Importa, usa Arena sul computer.<br>Arena accetta solo carte che esistono su Arena: quelle assenti vengono segnalate o ignorate.</div></details></div>`;
+  $('modal').hidden = false; document.body.classList.add('noscroll');
+  const ta = $('exTxt'); ta.onfocus = () => ta.select();
+  $('exCopy').onclick = () => copyText(txt, 'Lista copiata');
+  $('exFile').onclick = () => { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([txt], { type: 'text/plain' })); a.download = (d.name || 'mazzo').replace(/[^\w\- ]+/g, '').trim().replace(/\s+/g, '_') + '.txt'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 2000); };
+  if ($('exShare')) $('exShare').onclick = () => { navigator.share({ title: d.name, text: txt }).catch(() => {}); };
+};
 $('btnImport').onclick = () => { $('importBox').hidden = !$('importBox').hidden; };
 $('doImport').onclick = () => importList($('importText').value, $('importReplace').checked);
 
