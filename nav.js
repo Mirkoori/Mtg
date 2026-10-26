@@ -13,7 +13,7 @@
     { h: 'collezione.html', l: 'Collezione', i: 'col', m: ['collezione.html'] },
     { h: 'mazzi.html', l: 'Mazzi', i: 'deck', m: ['mazzi.html'] },
     { h: 'prova.html', l: 'Gioca', i: 'play', m: ['prova.html', 'segnapunti.html'] },
-    { h: 'carrello.html', l: 'Mercato', i: 'shop', m: ['carrello.html', 'vendi.html'] }
+    { h: 'carrello.html', l: 'Mercato', i: 'shop', m: ['carrello.html', 'vendi.html', 'desideri.html'] }
   ];
   var cur = (location.pathname.split('/').pop() || 'index.html');
   Array.prototype.forEach.call(document.querySelectorAll('main nav, body > nav'), function (n) { n.parentNode.removeChild(n); });
@@ -32,11 +32,11 @@
       mp.insertBefore(sp, mp.firstChild);
     }
   }
-  if (cur === 'carrello.html' || cur === 'vendi.html') {
+  if (cur === 'carrello.html' || cur === 'vendi.html' || cur === 'desideri.html') {
     var main = document.querySelector('main');
     if (main) {
       var s = document.createElement('div'); s.className = 'subnav';
-      s.innerHTML = '<a href="carrello.html"' + (cur === 'carrello.html' ? ' class="on"' : '') + '>Compra (Carrello)</a><a href="vendi.html"' + (cur === 'vendi.html' ? ' class="on"' : '') + '>Vendi</a>';
+      s.innerHTML = '<a href="carrello.html"' + (cur === 'carrello.html' ? ' class="on"' : '') + '>Compra (Carrello)</a><a href="vendi.html"' + (cur === 'vendi.html' ? ' class="on"' : '') + '>Vendi</a><a href="desideri.html"' + (cur === 'desideri.html' ? ' class="on"' : '') + '>Desideri</a>';
       main.insertBefore(s, main.firstChild);
     }
   }

@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#070605">
+<title>Lista desideri</title>
+<style>
+  :root { --bg:#f5f4f0; --card:#ffffff; --ink:#1d1d1b; --muted:#6b6a64; --line:#e3e1d9; --accent:#1f5f4a; --accent-ink:#ffffff; --warn:#a15c00; --bad:#b3261e; --ok:#1f7a4d; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#161715; --card:#1f201e; --ink:#ecebe6; --muted:#9b9a93; --line:#33342f; --accent:#4fb08c; --accent-ink:#0d1f18; --warn:#e0a24a; --bad:#f2837b; --ok:#6cd09c; } }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; }
+  main { max-width:900px; margin:0 auto; padding:14px 12px 90px; }
+  h1 { font-size:21px; margin:0 0 10px; }
+  .panel { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:12px 14px; margin-bottom:12px; }
+  input[type=text], input[type=number] { width:100%; padding:9px 10px; border:1px solid var(--line); border-radius:8px; background:var(--bg); color:var(--ink); font:inherit; font-size:16px; }
+  button { font:inherit; padding:8px 14px; border-radius:8px; border:1px solid var(--accent); background:var(--accent); color:var(--accent-ink); cursor:pointer; font-weight:600; }
+  button.secondary { background:transparent; color:var(--accent); } button:disabled { opacity:.5; }
+  .row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-top:10px; }
+  .msg { color:var(--muted); font-size:13.5px; } .err { color:var(--bad); }
+  .res { display:grid; grid-template-columns:44px 1fr auto; gap:8px; align-items:center; padding:6px 0; border-bottom:1px solid var(--line); }
+  .res img, .w img { width:44px; border-radius:4px; display:block; background:var(--line); min-height:60px; }
+  .w { display:grid; grid-template-columns:auto 44px 1fr auto; gap:8px; align-items:center; padding:8px 4px; border-bottom:1px solid var(--line); }
+  .w .nm { font-weight:600; line-height:1.25; } .w .sub { font-size:12.5px; color:var(--muted); }
+  .w .ctl { display:flex; flex-direction:column; gap:4px; align-items:flex-end; font-size:12px; color:var(--muted); }
+  .w .ctl input { width:74px; padding:4px 6px; font-size:14px; text-align:right; }
+  .w.deal { background:rgba(79,176,140,.14); } .deal .pz { color:var(--ok); font-weight:700; }
+  .pz { font-size:13px; }
+  #toast { position:fixed; left:50%; bottom:22px; transform:translateX(-50%); background:#222; color:#fff; padding:9px 16px; border-radius:20px; font-size:14px; z-index:30; }
+</style>
+<link rel="stylesheet" href="theme.css?v=5">
+</head>
+<body>
+<main>
+  <h1>Lista desideri</h1>
+  <div class="panel msg">Le carte che ti mancano. Imposti un prezzo massimo e l'app ti segnala quando una stampa costa meno (prezzo Cardmarket tramite Scryfall). Poi le mandi al Carrello per cercarle su CardTrader.</div>
+  <section class="panel">
+    <div class="row" style="margin-top:0"><input type="text" id="q" placeholder="Nome della carta (italiano o inglese)" autocomplete="off" style="flex:1;min-width:200px"><button id="btnFind">Cerca</button></div>
+    <div id="res"></div>
+  </section>
+  <section class="panel">
+    <div class="row" style="margin-top:0"><b id="cnt">0 carte</b><span style="flex:1"></span><button class="secondary" id="btnCheck">Controlla prezzi</button><button id="btnCart" disabled>Cerca su CardTrader</button></div>
+    <div class="msg" id="stat" style="margin-top:6px"></div>
+    <div id="list"></div>
+  </section>
+</main>
+<div id="toast" hidden></div>
+<script src="nav.js?v=4"></script>
+<script src="sync.js?v=7"></script>
+<script src="scry.js?v=8"></script>
+<script src="desideri.js?v=1"></script>
+</body>
+</html>

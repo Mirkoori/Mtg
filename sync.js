@@ -2,7 +2,7 @@
 /* Account e salvataggio online (Supabase). Senza config.js compilato non fa nulla.
    Sincronizza solo mazzi, carte dei mazzi e collezione. Il token Cardtrader NON viene mai inviato. */
 (function () {
-  const KEYS = ['mtg_decks', 'mtg_cards', 'mtg_cur', 'mtg_owned', 'mtg_owned_rows', 'mtg_entries', 'mtg_sell_sent', 'mtg_sell_list', 'mtg_events', 'mtg_place', 'mtg_value_hist'];
+  const KEYS = ['mtg_decks', 'mtg_cards', 'mtg_cur', 'mtg_owned', 'mtg_owned_rows', 'mtg_entries', 'mtg_sell_sent', 'mtg_sell_list', 'mtg_events', 'mtg_place', 'mtg_value_hist', 'mtg_wish'];
   const cfg = window.MTG_CFG || {};
   const LS = window.localStorage;
   const rawSet = Storage.prototype.setItem, rawRem = Storage.prototype.removeItem;
