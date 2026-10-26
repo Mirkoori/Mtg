@@ -72,6 +72,10 @@ function parseCSV(text, delim) {
   if (f !== '' || row.length) { row.push(f); rows.push(row); }
   return rows;
 }
+const COND_MAP = { mint: 'Mint', m: 'Mint', near_mint: 'Near Mint', 'near mint': 'Near Mint', nm: 'Near Mint', excellent: 'Near Mint', lightly_played: 'Slightly Played', 'lightly played': 'Slightly Played', slightly_played: 'Slightly Played', 'slightly played': 'Slightly Played', lp: 'Slightly Played', sp: 'Slightly Played', good: 'Slightly Played', moderately_played: 'Moderately Played', 'moderately played': 'Moderately Played', mp: 'Moderately Played', played: 'Played', pl: 'Played', heavily_played: 'Heavily Played', 'heavily played': 'Heavily Played', hp: 'Heavily Played', damaged: 'Poor', poor: 'Poor', dmg: 'Poor' };
+const LANG_MAP = { en: 'en', english: 'en', inglese: 'en', it: 'it', italian: 'it', italiano: 'it', fr: 'fr', french: 'fr', de: 'de', german: 'de', es: 'es', spanish: 'es', pt: 'pt', portuguese: 'pt', ja: 'jp', jp: 'jp', japanese: 'jp', ko: 'kr', kr: 'kr', korean: 'kr', ru: 'ru', russian: 'ru', zhs: 'zhs', 'zh-cn': 'zhs', zht: 'zht', 'zh-tw': 'zht' };
+const COND_LIST = ['Mint', 'Near Mint', 'Slightly Played', 'Moderately Played', 'Played', 'Heavily Played', 'Poor'];
+const LANG_LIST = [['en', 'Inglese'], ['it', 'Italiano'], ['fr', 'Francese'], ['de', 'Tedesco'], ['es', 'Spagnolo'], ['pt', 'Portoghese'], ['jp', 'Giapponese'], ['kr', 'Coreano'], ['ru', 'Russo'], ['zhs', 'Cinese semplificato'], ['zht', 'Cinese tradizionale']];
 function readEntries(text) {
   text = text.replace(/^\ufeff/, '');
   let delim = ',';
@@ -84,7 +88,7 @@ function readEntries(text) {
   const ix = names => { for (const n of names) { const i = head.indexOf(n); if (i >= 0) return i; } return -1; };
   const iName = ix(['name', 'card name', 'nome', 'nome carta']), iSet = ix(['set code', 'set', 'edition', 'edizione']),
     iCn = ix(['collector number', 'card number', 'numero', 'number']), iSid = ix(['scryfall id', 'scryfall_id']),
-    iQty = ix(['quantity', 'qty', 'count', 'quantita']), iFoil = ix(['foil', 'printing', 'finish']);
+    iQty = ix(['quantity', 'qty', 'count', 'quantita']), iFoil = ix(['foil', 'printing', 'finish']), iCond = ix(['condition', 'condizione']), iLang = ix(['language', 'lingua']);
   if (iName < 0 && iSid < 0) throw new Error('Colonna del nome non trovata. Colonne del file: ' + head.join(', '));
   const map = new Map();
   rows.forEach(r => {
@@ -98,6 +102,9 @@ function readEntries(text) {
     const foil = /foil|etched/i.test(fv) && !/^(non-?foil|normal|no|false|0)$/i.test(fv);
     const key = sid || (set && cn ? set + '/' + cnNorm(cn) : 'n:' + name.toLowerCase());
     const e = map.get(key) || { key, name, set, cn, sid, qty: 0, foilQty: 0 };
+    const cv = iCond >= 0 ? COND_MAP[String(r[iCond] || '').trim().toLowerCase()] : '', lv = iLang >= 0 ? LANG_MAP[String(r[iLang] || '').trim().toLowerCase()] : '';
+    if (cv) e.cond = e.cond === undefined || e.cond === cv ? cv : '*';
+    if (lv) e.lang = e.lang === undefined || e.lang === lv ? lv : '*';
     e.qty += qty; if (foil) e.foilQty += qty;
     map.set(key, e);
   });
@@ -167,6 +174,8 @@ async function loadText(text) {
   let entries;
   try { entries = readEntries(text); } catch (e) { return say('loadMsg', e.message); }
   if (!entries.length) return say('loadMsg', 'Nessuna carta trovata nel file.');
+  const prevE = new Map((C.entries || []).map(x => [x.key, x]));
+  entries.forEach(x => { const o = prevE.get(x.key); if (o) { if (x.cond === undefined && o.cond) x.cond = o.cond; if (x.lang === undefined && o.lang) x.lang = o.lang; } });
   C.entries = entries;
   try {
     store.set('mtg_owned_rows', JSON.stringify(entries.map(e => [e.name, e.set, e.qty])));
@@ -298,8 +307,10 @@ function showModal(x) {
   const same = items().filter(y => cardOf(y).id === c.id);
   const step = (y, f, max) => { const s = SELL[y.key] || {}; const n = s[f] || 0; return `<span class="st"><button class="secondary" data-sell="${esc(y.key)}" data-f="${f}" data-d="-1"${n <= 0 ? ' disabled' : ''}>&minus;</button><b>${n}</b><button class="secondary" data-sell="${esc(y.key)}" data-f="${f}" data-d="1"${n >= max ? ' disabled' : ''}>+</button></span>`; };
   const prints = same.map(y => { const cc = cardOf(y), nf = y.qty - (y.foilQty || 0);
+    const sel = (kind, list, cur) => `<select data-ent="${esc(y.key)}" data-k="${kind}" style="padding:4px 6px;font-size:13px;border-radius:6px"><option value="">${kind === 'cond' ? 'Predefinita (impostata in Vendi)' : 'Predefinita (impostata in Vendi)'}</option>${list.map(o => `<option value="${esc(o[0])}"${o[0] === cur ? ' selected' : ''}>${esc(o[1])}</option>`).join('')}</select>`;
+    const cl = COND_LIST.map(c => [c, c]);
     return `<div class="sellrow"><span>${y.qty} \u00d7 ${esc(cc.setName)} (${esc(cc.set)}${cc.cn ? ' #' + esc(cc.cn) : ''})${y.foilQty ? ' - di cui ' + y.foilQty + ' foil' : ''}</span>` +
-      (nf > 0 ? `<span class="st-l">Da vendere ${step(y, 'n', nf)}</span>` : '') + (y.foilQty ? `<span class="st-l">Foil da vendere ${step(y, 'f', y.foilQty)}</span>` : '') + '</div>'; }).join('');
+      (nf > 0 ? `<span class="st-l">Da vendere ${step(y, 'n', nf)}</span>` : '') + (y.foilQty ? `<span class="st-l">Foil da vendere ${step(y, 'f', y.foilQty)}</span>` : '') + `</div><details class="sub2" style="margin:0 0 4px"><summary style="cursor:pointer;font-size:12.5px;color:var(--muted)">Stato e lingua${y.cond && y.cond !== '*' ? ': ' + esc(y.cond) : ''}${y.lang && y.lang !== '*' ? ', ' + esc(y.lang) : ''}</summary><div class="row" style="margin-top:4px"><label class="msg">Condizione ${sel('cond', cl, y.cond)}</label><label class="msg">Lingua ${sel('lang', LANG_LIST, y.lang)}</label></div></details>`; }).join('');
   const it = C.it[c.id];
   const textIt = c.text_it, textEn = c.text;
   $('mBody').innerHTML = `
@@ -321,6 +332,13 @@ const closeModal = () => { $('modal').hidden = true; document.body.classList.rem
 // ---------- eventi
 $('csv').onchange = async ev => { const f = ev.target.files[0]; if (!f) return; loadText(await f.text()); };
 $('result').addEventListener('click', ev => { const t = ev.target.closest('[data-i]'); if (t) openModal(+t.dataset.i); });
+$('modal').addEventListener('change', async ev => {
+  const s = ev.target.closest('[data-ent]'); if (!s) return;
+  const e = C.entries.find(z => z.key === s.dataset.ent); if (!e) return;
+  if (s.value) e[s.dataset.k] = s.value; else delete e[s.dataset.k];
+  await idb.set('entries', C.entries); store.set('mtg_entries', JSON.stringify(C.entries));
+  toast('Salvato'); showModal(openX);
+});
 $('modal').addEventListener('click', ev => {
   const sb = ev.target.closest('[data-sell]');
   if (sb) { const k = sb.dataset.sell, f = sb.dataset.f, e = C.entries.find(z => z.key === k); if (!e) return; const s = SELL[k] = SELL[k] || {}; const max = f === 'f' ? (e.foilQty || 0) : e.qty - (e.foilQty || 0); s[f] = Math.max(0, Math.min(max, (s[f] || 0) + (+sb.dataset.d))); sellSave(); showModal(openX); render(); return; } if (ev.target === $('modal') || ev.target.id === 'mClose') closeModal(); });

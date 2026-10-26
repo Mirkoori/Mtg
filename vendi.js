@@ -45,13 +45,15 @@ function deckNeed() { // copie usate nei mazzi, per nome inglese
   jget('mtg_decks', []).forEach(d => (d.cards || []).forEach(e => { const c = cards[e.id]; if (!c) return; const k = String(c.name).toLowerCase(); need[k] = (need[k] || 0) + (e.qty || 1); }));
   return need;
 }
+const pickCond = (e, d) => (e.cond && e.cond !== '*' ? e.cond : d);
+const pickLang = (e, d) => (e.lang && e.lang !== '*' ? e.lang : d);
 function buildFromList(entries) {
   const list = jget('mtg_sell_list', {}), lang = $('lang').value, cond = $('cond').value, sent = sentMap(), rows = [];
   entries.forEach(e => {
     const s = list[e.key]; if (!s) return; const c = CARDS[e.key];
     [[false, Math.min(s.n || 0, e.qty - (e.foilQty || 0))], [true, Math.min(s.f || 0, e.foilQty || 0)]].forEach(([foil, n]) => {
       if (n <= 0) return;
-      const r = { key: e.key, name: c.name, nameIt: (IT[c.id] && IT[c.id][0]) || c.name_it || c.name, set: String(c.set || e.set || '').toLowerCase(), setName: c.setName, cn: c.cn || e.cn, img: c.img, qty: n, maxQty: n, foil: foil, lang: lang, cond: cond, eur: c.eur || 0, eurFoil: c.eurFoil || 0, on: true };
+      const r = { key: e.key, name: c.name, nameIt: (IT[c.id] && IT[c.id][0]) || c.name_it || c.name, set: String(c.set || e.set || '').toLowerCase(), setName: c.setName, cn: c.cn || e.cn, img: c.img, qty: n, maxQty: n, foil: foil, lang: pickLang(e, lang), cond: pickCond(e, cond), eur: c.eur || 0, eurFoil: c.eurFoil || 0, on: true };
       rows.push(r);
     });
   });
@@ -77,7 +79,7 @@ function buildRows(entries) {
       const foilQ = Math.min(e.foilQty || 0, sell);
       [[false, sell - foilQ], [true, foilQ]].forEach(([foil, n]) => {
         if (n <= 0) return;
-        const r = { key: e.key, name: c.name, nameIt: (IT[c.id] && IT[c.id][0]) || c.name_it || c.name, set: String(c.set || e.set || '').toLowerCase(), setName: c.setName, cn: c.cn || e.cn, img: c.img, qty: n, maxQty: n, foil: foil, lang: lang, cond: cond, eur: c.eur || 0, eurFoil: c.eurFoil || 0, on: true };
+        const r = { key: e.key, name: c.name, nameIt: (IT[c.id] && IT[c.id][0]) || c.name_it || c.name, set: String(c.set || e.set || '').toLowerCase(), setName: c.setName, cn: c.cn || e.cn, img: c.img, qty: n, maxQty: n, foil: foil, lang: pickLang(e, lang), cond: pickCond(e, cond), eur: c.eur || 0, eurFoil: c.eurFoil || 0, on: true };
         r.sent = !!sent[rowKey(r)]; if (r.sent) r.on = false;
         rows.push(r);
       });
