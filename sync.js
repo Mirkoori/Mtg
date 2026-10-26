@@ -101,10 +101,11 @@
     }
   }
   function mount() {
-    const nav = document.querySelector('nav'); if (!nav) return;
-    btn = document.createElement('a'); btn.href = '#'; btn.textContent = 'Accedi';
-    btn.style.cssText = 'margin-left:auto;padding:7px 14px;border-radius:999px;border:1px solid var(--accent,#1f5f4a);text-decoration:none;color:var(--accent,#1f5f4a);font-weight:600;font-size:14px';
-    btn.onclick = e => { e.preventDefault(); openBox(); }; nav.appendChild(btn);
+    btn = document.createElement('a'); btn.href = '#'; btn.textContent = 'Accedi'; btn.className = 'acct';
+    btn.onclick = e => { e.preventDefault(); openBox(); };
+    const bar = document.querySelector('.tabbar');
+    if (bar && window.innerWidth >= 900) { bar.appendChild(btn); return; }
+    document.body.classList.add('hasacct'); document.body.appendChild(btn);
   }
   function load(cb) {
     if (window.supabase) return cb();

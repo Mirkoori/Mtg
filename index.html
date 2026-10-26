@@ -4,237 +4,100 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="theme-color" content="#070605">
-<title>Cardtrader Cart Filler</title>
+<title>myMTG</title>
 <style>
-  :root {
-    --bg:#f5f4f0; --card:#ffffff; --ink:#1d1d1b; --muted:#6b6a64; --line:#e3e1d9;
-    --accent:#1f5f4a; --accent-ink:#ffffff; --warn:#a15c00; --bad:#b3261e; --ok:#1f7a4d;
-  }
-  @media (prefers-color-scheme: dark) {
-    :root { --bg:#161715; --card:#1f201e; --ink:#ecebe6; --muted:#9b9a93; --line:#33342f;
-      --accent:#4fb08c; --accent-ink:#0d1f18; --warn:#e0a24a; --bad:#f2837b; --ok:#6cd09c; }
-  }
+  :root { --bg:#070605; --card:#43301f; --ink:#f3e7cc; --muted:#c3aa80; --line:#7a5c36; --accent:#d9a441; --accent-ink:#2a1a0a; }
   * { box-sizing:border-box; }
-  body { margin:0; background:var(--bg); color:var(--ink);
-    font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; }
-  main { max-width:900px; margin:0 auto; padding:20px 14px 80px; }
-  h1 { font-size:21px; margin:0 0 4px; }
-  .sub { color:var(--muted); margin:0 0 18px; }
-  section { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:14px 16px; margin-bottom:12px; }
-  h2 { font-size:15px; margin:0 0 10px; display:flex; gap:8px; align-items:center; }
-  h2 .n { background:var(--accent); color:var(--accent-ink); width:22px; height:22px; border-radius:50%;
-    display:inline-grid; place-items:center; font-size:12px; flex:none; }
-  label { display:block; font-size:13px; color:var(--muted); margin:10px 0 4px; }
-  input[type=text], input[type=password], input[type=number], input[type=url], select {
-    width:100%; padding:9px 10px; border:1px solid var(--line); border-radius:8px;
-    background:var(--bg); color:var(--ink); font:inherit; font-size:16px; }
-  input[type=file] { font:inherit; max-width:100%; }
-  .row { display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:10px; }
-  .check { display:flex; gap:8px; align-items:center; font-size:14px; margin:8px 0; }
-  .check input { width:auto; } .check label { margin:0; color:inherit; font-size:14px; }
-  button { font:inherit; padding:10px 16px; border-radius:8px; border:1px solid var(--accent);
-    background:var(--accent); color:var(--accent-ink); cursor:pointer; font-weight:600; }
-  button.secondary { background:transparent; color:var(--accent); }
-  button:disabled { opacity:.45; cursor:not-allowed; }
-  .actions { display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-top:12px; }
-  .msg { font-size:13px; color:var(--muted); }
-  .msg.ok { color:var(--ok); } .msg.err { color:var(--bad); } .msg.warn { color:var(--warn); }
-  .chips { display:flex; flex-wrap:wrap; gap:8px; }
-  .chip { border:1px solid var(--line); border-radius:999px; padding:5px 12px; font-size:14px;
-    display:flex; gap:6px; align-items:center; background:var(--bg); margin:0; color:var(--ink); }
-  .chip input { width:auto; margin:0; }
-  table { width:100%; border-collapse:collapse; font-size:13.5px; }
-  th, td { text-align:left; padding:6px 6px; border-bottom:1px solid var(--line); vertical-align:top; }
-  th { color:var(--muted); font-weight:600; position:sticky; top:0; background:var(--card); }
-  td.num, th.num { text-align:right; white-space:nowrap; }
-  .en { color:var(--muted); font-size:12px; }
-  .show-sm { display:none; margin-top:2px; }
-  @media (max-width:560px) { .show-sm { display:block; } }
-  .thumb { width:46px; aspect-ratio:488/680; border-radius:4px; background:var(--line); display:block; cursor:zoom-in; object-fit:cover; }
-  #zoom { position:fixed; inset:0; background:rgba(0,0,0,.75); z-index:50; display:grid; place-items:center; padding:14px; cursor:zoom-out; }
-  #zoom[hidden] { display:none; }
-  #zoom img { max-width:min(92vw,420px); max-height:88vh; border-radius:14px; }
-  .tablewrap { max-height:60vh; overflow:auto; border:1px solid var(--line); border-radius:8px; margin-top:10px; }
-  .summary { display:flex; gap:22px; flex-wrap:wrap; margin-top:8px; }
-  .summary b { font-size:18px; display:block; } .summary span { color:var(--muted); font-size:12px; }
-  details { margin-top:10px; font-size:13px; } summary { cursor:pointer; color:var(--muted); }
-  progress { width:100%; height:12px; margin-top:10px; }
-  textarea { width:100%; min-height:130px; padding:9px 10px; border:1px solid var(--line); border-radius:8px; background:var(--bg); color:var(--ink); font:inherit; font-size:16px; }
-  .hint { font-size:12.5px; color:var(--muted); margin-top:4px; }
-  .badge { font-size:12px; background:var(--bg); border:1px solid var(--line); border-radius:6px; padding:2px 8px; color:var(--muted); }
-  a { color:var(--accent); }
-  nav { display:flex; gap:6px; margin-bottom:12px; }
-  nav a { padding:7px 14px; border-radius:999px; border:1px solid var(--line); text-decoration:none; color:var(--ink); background:var(--card); font-weight:600; font-size:14px; }
-  nav a.on { background:var(--accent); color:var(--accent-ink); border-color:var(--accent); }
-  @media (max-width:520px) { .hide-sm { display:none; } }
+  body { margin:0; background:#070605; color:var(--ink); font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; }
+  main { max-width:1000px; margin:0 auto; padding:0 0 30px; }
+  a { color:inherit; }
+  .hero { padding:22px 16px 18px; background:radial-gradient(ellipse at 85% 0%, rgba(217,164,65,.28), transparent 60%), linear-gradient(#17110b, #0b0805); border-bottom:1px solid #3a2a18; }
+  .brand { display:flex; align-items:center; gap:10px; font-family:Georgia,"Times New Roman",serif; font-size:13px; letter-spacing:.28em; text-transform:uppercase; color:#e6b857; }
+  .brand svg { width:24px; height:24px; fill:none; stroke:#e6b857; stroke-width:1.6; stroke-linecap:round; stroke-linejoin:round; }
+  h1 { font-family:Georgia,"Times New Roman",serif; font-size:30px; line-height:1.15; margin:12px 0 4px; color:#f6ead0; }
+  .lead { color:var(--muted); margin:0; }
+  .stats { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-top:16px; }
+  .stat { background:rgba(255,235,190,.06); border:1px solid #5a4226; border-radius:12px; padding:9px 6px; text-align:center; }
+  .stat b { display:block; font-family:Georgia,serif; font-size:21px; color:#f6ead0; line-height:1.15; } .stat span { font-size:10.5px; letter-spacing:.07em; text-transform:uppercase; color:var(--muted); }
+  .chips { display:flex; gap:8px; overflow-x:auto; padding:14px 16px 4px; scrollbar-width:none; }
+  .chips::-webkit-scrollbar { display:none; }
+  .pill { flex:none; display:flex; align-items:center; gap:7px; padding:9px 15px; border-radius:999px; border:1px solid #7a5c36; background:#1c130b; color:#f3e7cc; text-decoration:none; font-weight:600; font-size:14px; white-space:nowrap; }
+  .pill svg { width:17px; height:17px; fill:none; stroke:#e6b857; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
+  .pill small { background:#e6b857; color:#2a1a0a; border-radius:9px; padding:0 7px; font-weight:800; font-size:12px; }
+  main section.blk { margin-top:26px; background:none; border:0; box-shadow:none; border-radius:0; padding:0; }
+  main section.blk.dark { background:linear-gradient(#0d0906,#150e08); padding:20px 0 22px; border-top:1px solid #2e2013; border-bottom:1px solid #2e2013; }
+  .bh { display:flex; align-items:baseline; justify-content:space-between; padding:0 16px; margin-bottom:12px; }
+  .bh h2 { margin:0; font-family:Georgia,"Times New Roman",serif; font-size:21px; color:#f6ead0; }
+  .bh a { color:#e6b857; font-size:13.5px; }
+  .rail { display:flex; gap:12px; overflow-x:auto; padding:2px 16px 8px; scroll-snap-type:x mandatory; scrollbar-width:none; -webkit-overflow-scrolling:touch; }
+  .rail::-webkit-scrollbar { display:none; }
+  .rail > * { scroll-snap-align:start; flex:none; }
+  .deck { width:230px; height:150px; border-radius:16px; position:relative; overflow:hidden; text-decoration:none; border:1px solid #8a6a3a; box-shadow:0 6px 16px rgba(0,0,0,.6); background:#2a1c10; }
+  .deck img { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }
+  .deck::after { content:""; position:absolute; inset:0; background:linear-gradient(transparent 35%, rgba(5,3,1,.92)); }
+  .deck .t { position:absolute; left:12px; right:12px; bottom:10px; z-index:1; }
+  .deck .t b { display:block; font-family:Georgia,serif; font-size:17px; color:#f6ead0; line-height:1.2; } .deck .t span { font-size:12px; color:#d9c39a; }
+  .deck.new { display:grid; place-items:center; text-align:center; color:#e6b857; border-style:dashed; font-weight:700; }
+  .cardx { width:150px; text-decoration:none; }
+  .cardx img { width:100%; display:block; border-radius:9px; aspect-ratio:488/680; background:#241a10; box-shadow:0 8px 18px rgba(0,0,0,.7); }
+  .cardx .c { margin-top:7px; font-size:13px; line-height:1.25; } .cardx .c b { display:block; color:#e6b857; font-size:14px; }
+  .set { width:200px; border-radius:16px; padding:14px; background:linear-gradient(160deg,#4b3622,#2a1b0e); border:1px solid #8a6a3a; box-shadow:0 5px 14px rgba(0,0,0,.55); text-decoration:none; }
+  .set img { width:38px; height:38px; filter:invert(.9) sepia(.5) saturate(2.2) hue-rotate(-12deg); display:block; }
+  .set b { display:block; margin-top:9px; font-family:Georgia,serif; font-size:16px; line-height:1.2; color:#f6ead0; }
+  .set .d { margin-top:6px; font-size:12.5px; color:#d9c39a; } .set .cd { display:inline-block; margin-top:8px; padding:1px 10px; border-radius:999px; background:#e6b857; color:#2a1a0a; font-weight:800; font-size:12px; }
+  .set .cd.past { background:#3a2a18; color:#d9c39a; }
+  .empty { margin:16px; padding:18px; border:1px dashed #7a5c36; border-radius:14px; text-align:center; color:var(--muted); }
+  .empty a { color:#e6b857; font-weight:700; }
+  .note { padding:0 16px; color:#9c8460; font-size:12px; margin-top:6px; }
+  .skel { width:150px; aspect-ratio:488/680; border-radius:9px; background:linear-gradient(90deg,#1c130b,#2a1c10,#1c130b); background-size:200% 100%; animation:sk 1.4s linear infinite; }
+  @keyframes sk { to { background-position:-200% 0; } }
+  @media (min-width:900px) { h1 { font-size:36px; } .hero { padding:30px 24px 22px; border-radius:0 0 20px 20px; } .rail, .bh, .chips, .note { padding-left:24px; padding-right:24px; } .deck { width:280px; height:170px; } .cardx { width:170px; } }
 </style>
-<link rel="stylesheet" href="theme.css?v=2">
+<link rel="stylesheet" href="theme.css?v=5">
 </head>
-<body>
+<body class="home">
 <main>
-  <nav><a href="index.html" class="on">Carrello</a><a href="mazzi.html">Mazzi</a><a href="collezione.html">Collezione</a><a href="vendi.html">Vendi</a><a href="prova.html">Prova</a></nav>
-  <h1>Cardtrader Cart Filler</h1>
-  <p class="sub">Riempie il carrello Cardtrader con le carte che ti mancano, solo CardTrader Zero. Non acquista mai nulla.</p>
+  <header class="hero">
+    <div class="brand"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5l2.6 6.1 6.4.5-4.9 4.2 1.5 6.4L12 16.4 6.4 19.7l1.5-6.4L3 9.1l6.4-.5z"/></svg>myMTG</div>
+    <h1 id="hello">Bentornato</h1>
+    <p class="lead" id="lead">La tua collezione, i tuoi mazzi e le novit&agrave; di Magic.</p>
+    <div class="stats" id="stats"></div>
+  </header>
 
-  <section>
-    <h2><span class="n">1</span> Collegamento a Cardtrader</h2>
-    <label for="token">Token API (Cardtrader &#8594; Impostazioni &#8594; API)</label>
-    <input id="token" type="password" autocomplete="off" placeholder="Incolla qui il tuo token">
-    <div class="check"><input id="remember" type="checkbox"><label for="remember">Ricorda il token su questo dispositivo</label></div>
-    <details>
-      <summary>Opzioni avanzate (proxy)</summary>
-      <label for="proxy">Indirizzo del proxy, solo se il browser blocca la connessione a Cardtrader</label>
-      <input id="proxy" type="url" placeholder="https://il-tuo-worker.workers.dev">
-    </details>
-    <div class="actions">
-      <button id="btnConnect">Verifica e carica espansioni</button>
-      <span id="msgConnect" class="msg"></span>
-    </div>
+  <div class="chips" id="chips">
+    <a class="pill" href="mazzi.html"><svg viewBox="0 0 24 24"><path d="M12 3.5 20 8l-8 4.5L4 8z"/><path d="M4 12l8 4.5 8-4.5"/></svg>Costruisci un mazzo</a>
+    <a class="pill" href="prova.html"><svg viewBox="0 0 24 24"><path d="M7 5l10 14M17 5 7 19"/></svg>Prova una mano</a>
+    <a class="pill" href="collezione.html?sell=1"><svg viewBox="0 0 24 24"><path d="M4 6h2.2l2 9.5h9.3L19 9H7.2"/></svg>Da vendere <small id="nSell" hidden></small></a>
+    <a class="pill" href="collezione.html?many=1"><svg viewBox="0 0 24 24"><rect x="4" y="5" width="11" height="15" rx="1.8"/></svg>Pi&ugrave; di 4 uguali</a>
+    <a class="pill" href="carrello.html"><svg viewBox="0 0 24 24"><circle cx="9.5" cy="19" r="1.4"/><circle cx="16.5" cy="19" r="1.4"/><path d="M4 6h2.2l2 9.5h9.3L19 9H7.2"/></svg>Carrello CardTrader</a>
+  </div>
+
+  <section class="blk" id="decksBlk">
+    <div class="bh"><h2>I tuoi mazzi</h2><a href="mazzi.html">Apri</a></div>
+    <div class="rail" id="decks"></div>
   </section>
 
-  <section id="secMode">
-    <h2>Cosa vuoi comprare?</h2>
-    <div class="chips">
-      <label class="chip"><input type="radio" name="mode" value="exp" checked>Un'espansione intera</label>
-      <label class="chip"><input type="radio" name="mode" value="list">Una lista di carte (PDF, CSV, testo)</label>
-    </div>
+  <section class="blk dark" id="topBlk" hidden>
+    <div class="bh"><h2>Le pi&ugrave; preziose</h2><a href="collezione.html">Collezione</a></div>
+    <div class="rail" id="top"></div>
   </section>
 
-  <section>
-    <h2><span class="n">2</span> Le carte che hai gi&#224;</h2>
-    <label for="csv">File CSV della collezione (Dragon Shield, ManaBox e simili: colonne nome, codice set e quantit&#224;)</label>
-    <input id="csv" type="file" accept=".csv,text/csv,text/plain">
-    <div id="msgCsv" class="msg" style="margin-top:6px">Nessun file: non verr&#224; esclusa nessuna carta.</div>
-    <div class="row">
-      <div>
-        <label for="ownedMode">Come escludere le carte gi&#224; possedute</label>
-        <select id="ownedMode">
-          <option value="any">Escludi se ho il nome in qualsiasi edizione</option>
-          <option value="same_set">Escludi solo se ho quella stessa espansione</option>
-          <option value="none">Non escludere nulla</option>
-        </select>
-      </div>
-      <div class="only-exp">
-        <label for="copies">Copie totali che vuoi avere</label>
-        <input id="copies" type="number" min="1" value="1" inputmode="numeric">
-        <div class="hint">Se ne hai gi&#224; alcune, aggiunge solo la differenza.</div>
-      </div>
-    </div>
+  <section class="blk" id="setsBlk">
+    <div class="bh"><h2>Prossime uscite</h2><a href="https://scryfall.com/sets" target="_blank" rel="noopener">Tutte</a></div>
+    <div class="rail" id="sets"><div class="skel"></div><div class="skel"></div></div>
   </section>
 
-  <section id="secList" hidden>
-    <h2><span class="n">3</span> La lista di carte</h2>
-    <label for="listFile">Carica un file (PDF, CSV o testo) oppure incolla la lista qui sotto</label>
-    <input id="listFile" type="file" accept=".pdf,.csv,.txt,.text,application/pdf,text/csv,text/plain">
-    <label for="listText">Una carta per riga, con la quantit&#224; davanti (es. &#171;4 Fulmine&#187;). Vanno bene nomi italiani o inglesi.</label>
-    <textarea id="listText" rows="8" placeholder="4 Fulmine&#10;2 Controincantesimo&#10;1 Sol Ring"></textarea>
-    <div id="msgList" class="msg">Nessuna carta nella lista.</div>
-    <div class="hint">Per ogni carta viene messa nel carrello l'offerta CardTrader Zero pi&#249; economica tra le edizioni disponibili (ne controllo fino a 3). L'edizione esatta la scegli poi su Cardtrader, prima di pagare.</div>
-  </section>
-
-  <section id="secExp">
-    <h2><span class="n">3</span> Espansione e rarit&#224;</h2>
-    <label for="exp">Espansione</label>
-    <input id="exp" type="text" list="expList" placeholder="Scrivi per cercare, es. Lord of the Rings" disabled>
-    <datalist id="expList"></datalist>
-    <div class="actions">
-      <button id="btnExp" class="secondary" disabled>Carica rarit&#224;</button>
-      <span id="msgExp" class="msg"></span>
-    </div>
-    <div id="rarities" class="chips" style="margin-top:10px"></div>
-  </section>
-
-  <section>
-    <h2><span class="n">4</span> Preferenze <span class="badge">solo CardTrader Zero</span></h2>
-    <div class="row">
-      <div>
-        <label for="langMode">Lingua</label>
-        <select id="langMode">
-          <option value="it_en">Italiano, altrimenti inglese</option>
-          <option value="it">Solo italiano</option>
-          <option value="en">Solo inglese</option>
-          <option value="en_it">Inglese, altrimenti italiano</option>
-          <option value="any">Qualsiasi lingua</option>
-        </select>
-      </div>
-      <div>
-        <label for="cond">Condizione minima</label>
-        <select id="cond">
-          <option>Mint</option><option selected>Near Mint</option><option>Slightly Played</option>
-          <option>Moderately Played</option><option>Played</option><option>Heavily Played</option>
-        </select>
-      </div>
-      <div>
-        <label for="foil">Foil</label>
-        <select id="foil">
-          <option value="no">Solo normali</option><option value="yes">Solo foil</option><option value="any">Indifferente</option>
-        </select>
-      </div>
-      <div>
-        <label for="maxPrice">Prezzo massimo per carta (0 = nessun limite)</label>
-        <input id="maxPrice" type="number" min="0" step="0.05" value="0" inputmode="decimal">
-      </div>
-    </div>
-    <div class="only-exp">
-    <label>Colore (nessuno selezionato = tutti)</label>
-    <div id="colors" class="chips">
-      <label class="chip" title="Bianco" aria-label="Bianco"><input type="checkbox" value="W"><span class="pip pW">W</span></label>
-      <label class="chip" title="Blu" aria-label="Blu"><input type="checkbox" value="U"><span class="pip pU">U</span></label>
-      <label class="chip" title="Nero" aria-label="Nero"><input type="checkbox" value="B"><span class="pip pB">B</span></label>
-      <label class="chip" title="Rosso" aria-label="Rosso"><input type="checkbox" value="R"><span class="pip pR">R</span></label>
-      <label class="chip" title="Verde" aria-label="Verde"><input type="checkbox" value="G"><span class="pip pG">G</span></label>
-      <label class="chip" title="Incolore" aria-label="Incolore"><input type="checkbox" value="C"><span class="pip pC">C</span></label>
-      <label class="chip" title="Multicolore" aria-label="Multicolore"><input type="checkbox" value="M"><span class="pip pM">M</span></label>
-    </div>
-    <div class="row">
-      <div>
-        <label for="textFilter">Tipo o nome (separa con la virgola, es. angelo, soldato, chierico)</label>
-        <input id="textFilter" type="text" placeholder="vuoto = tutte le carte" autocomplete="off">
-      </div>
-      <div>
-        <label for="textMode">Cerca</label>
-        <select id="textMode">
-          <option value="any">Almeno una delle parole</option>
-          <option value="all">Tutte le parole</option>
-        </select>
-      </div>
-    </div>
-    <div class="hint">Cerca nel nome e nel tipo della carta (creatura, angelo, chierico...), in italiano e in inglese.</div>
-    </div>
-    <div class="hint">Con CardTrader Zero le spedizioni le fa Cardtrader in un unico pacco, quindi per ogni carta viene scelta semplicemente l'offerta pi&#249; economica.</div>
-    <div class="check only-exp"><input id="dedupe" type="checkbox" checked><label for="dedupe">Una sola versione per carta (ignora showcase, borderless ed extended art doppie)</label></div>
-  </section>
-
-  <section>
-    <h2><span class="n">5</span> Anteprima e carrello</h2>
-    <div class="actions">
-      <button id="btnPreview" disabled>Calcola anteprima</button>
-      <span id="msgPreview" class="msg"></span>
-    </div>
-    <div id="previewBox" hidden>
-      <div class="summary" id="summary"></div>
-      <div class="tablewrap"><table>
-        <thead><tr><th></th><th></th><th>Carta</th><th class="hide-sm">Edizione / N&#176;</th><th class="hide-sm">Colore</th><th class="hide-sm">Cond. / Lingua</th><th class="num">Qt&#224;</th><th class="num">Prezzo</th></tr></thead>
-        <tbody id="rows"></tbody>
-      </table></div>
-      <details id="missingBox" hidden><summary id="missingSum"></summary><div id="missingList"></div></details>
-      <details id="ownedBox" hidden><summary id="ownedSum"></summary><div id="ownedList"></div></details>
-      <div class="actions">
-        <button id="btnAdd">Aggiungi al carrello</button>
-        <button id="btnCsv" class="secondary">Esporta CSV delle carte da prendere</button>
-        <span id="msgAdd" class="msg"></span>
-      </div>
-      <progress id="prog" value="0" max="1" hidden></progress>
-      <div id="result"></div>
-    </div>
+  <section class="blk dark" id="spoilBlk">
+    <div class="bh"><h2>Appena rivelate</h2><a href="https://scryfall.com/spoilers" target="_blank" rel="noopener">Altre</a></div>
+    <div class="rail" id="spoil"><div class="skel"></div><div class="skel"></div><div class="skel"></div></div>
+    <div class="note">Le carte nuove hanno il nome inglese finch&eacute; non escono in italiano. Dati da Scryfall.</div>
   </section>
 </main>
-
-<div id="zoom" hidden></div>
+<div id="toast" hidden></div>
+<script src="nav.js?v=1"></script>
 <script src="config.js?v=2"></script>
-<script src="sync.js?v=5"></script>
-<script src="core.js?v=9"></script>
-<script src="deckcore.js?v=9"></script>
-<script src="app.js?v=11"></script>
+<script src="sync.js?v=6"></script>
+<script src="scry.js?v=8"></script>
+<script src="home.js?v=1"></script>
 </body>
 </html>

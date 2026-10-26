@@ -325,6 +325,7 @@ $('modal').addEventListener('click', ev => {
   const sb = ev.target.closest('[data-sell]');
   if (sb) { const k = sb.dataset.sell, f = sb.dataset.f, e = C.entries.find(z => z.key === k); if (!e) return; const s = SELL[k] = SELL[k] || {}; const max = f === 'f' ? (e.foilQty || 0) : e.qty - (e.foilQty || 0); s[f] = Math.max(0, Math.min(max, (s[f] || 0) + (+sb.dataset.d))); sellSave(); showModal(openX); render(); return; } if (ev.target === $('modal') || ev.target.id === 'mClose') closeModal(); });
 document.addEventListener('keydown', ev => { if (ev.key === 'Escape') closeModal(); });
+(function () { const q = new URLSearchParams(location.search); if (q.get('sell')) { F.sell = true; $('fSell').checked = true; } if (q.get('many')) { F.many = true; $('fMany').checked = true; } })();
 let qTimer = null;
 $('q').oninput = () => { clearTimeout(qTimer); qTimer = setTimeout(() => { F.q = $('q').value.trim(); C.limit = 120; render(); }, 200); };
 $('colors').addEventListener('click', ev => { const ch = ev.target.closest('.chip'); if (!ch) return; const k = ch.dataset.c; F.colors.has(k) ? F.colors.delete(k) : F.colors.add(k); ch.classList.toggle('on'); C.limit = 120; render(); });
