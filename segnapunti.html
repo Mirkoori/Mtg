@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#070605">
+<title>Segnapunti</title>
+<style>
+  :root { --bg:#070605; --card:#43301f; --ink:#f3e7cc; --muted:#c3aa80; --line:#7a5c36; --accent:#d9a441; --accent-ink:#2a1a0a; --bad:#f2837b; }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  body { margin:0; background:#070605; color:var(--ink); font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; }
+  main { max-width:900px; margin:0 auto; padding:10px 10px 0; }
+  .panel { padding:12px 14px; margin-bottom:10px; }
+  .row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-top:8px; }
+  .seg button { padding:8px 14px; } .seg button.on { background:linear-gradient(#e2b155,#c28f2f); color:#2a1a0a; }
+  .seg button:not(.on) { background:transparent; color:#e6bd6a; }
+  button { font:inherit; padding:8px 14px; border-radius:10px; border:1px solid #b98727; cursor:pointer; font-weight:700; }
+  .msg { color:var(--muted); font-size:13.5px; }
+  label.f { font-size:12.5px; color:var(--muted); display:block; }
+  #board { display:grid; gap:8px; height:calc(100dvh - 64px - 52px - 56px - 40px); min-height:300px; }
+  .pl { position:relative; border-radius:18px; overflow:hidden; border:1px solid rgba(255,255,255,.18); box-shadow:0 5px 14px rgba(0,0,0,.6); display:flex; flex-direction:column; justify-content:space-between; padding:8px 10px; user-select:none; -webkit-user-select:none; touch-action:manipulation; }
+  .pl.flip { transform:rotate(180deg); }
+  .pl.dead { filter:grayscale(1) brightness(.55); }
+  .pl .top { display:flex; justify-content:space-between; align-items:center; gap:6px; position:relative; z-index:2; }
+  .pl .nm { background:rgba(0,0,0,.28); border:0; color:#fff; font:inherit; font-weight:700; font-size:14px; padding:3px 9px; border-radius:999px; max-width:72%; min-width:0; width:auto; }
+  .pl .life { position:absolute; inset:0; display:grid; place-items:center; font-family:Georgia,serif; font-weight:700; color:#fff; text-shadow:0 2px 6px rgba(0,0,0,.55); font-size:clamp(54px, 17vmin, 120px); pointer-events:none; z-index:1; }
+  .pl .dlt { position:absolute; left:0; right:0; top:62%; text-align:center; font-weight:800; font-size:20px; color:#fff; text-shadow:0 1px 4px #000; z-index:3; pointer-events:none; }
+  .pl .hit { position:absolute; top:0; bottom:0; width:50%; z-index:1; background:none; border:0; border-radius:0; padding:0; color:rgba(255,255,255,.5); font-size:34px; font-weight:300; display:flex; align-items:center; }
+  .pl .hit.m { left:0; justify-content:flex-start; padding-left:14px; } .pl .hit.p { right:0; justify-content:flex-end; padding-right:14px; }
+  .pl .hit:active { background:rgba(255,255,255,.09); }
+  .pl .bot { display:flex; gap:6px; flex-wrap:wrap; justify-content:center; position:relative; z-index:2; }
+  .pl .bot button { background:rgba(0,0,0,.34); color:#fff; border:1px solid rgba(255,255,255,.3); padding:4px 10px; font-size:13px; border-radius:999px; }
+  .pl .bot button.alert { background:#b3261e; border-color:#ffb4ab; }
+  .c0 { background:linear-gradient(160deg,#8c7b4a,#4d4126); } .c1 { background:linear-gradient(160deg,#2b5d86,#143049); } .c2 { background:linear-gradient(160deg,#4a4040,#1b1717); }
+  .c3 { background:linear-gradient(160deg,#a8432b,#5a1d10); } .c4 { background:linear-gradient(160deg,#2f7a49,#133a22); } .c5 { background:linear-gradient(160deg,#7a4a8c,#38204a); }
+  #tools { position:fixed; left:0; right:0; bottom:calc(64px + env(safe-area-inset-bottom,0px)); z-index:14; display:flex; gap:6px; justify-content:center; padding:7px 8px; background:linear-gradient(transparent,#070605 40%); }
+  #tools button { background:#1c130b; color:#e6bd6a; padding:8px 12px; font-size:14px; }
+  #over { position:fixed; inset:0; z-index:40; background:rgba(0,0,0,.72); display:grid; place-items:center; }
+  #over div { text-align:center; } #over b { display:block; font-family:Georgia,serif; font-size:84px; line-height:1.1; color:#f6ead0; } #over span { color:var(--muted); font-size:16px; }
+  #sheet { position:fixed; inset:0; z-index:35; background:rgba(0,0,0,.62); display:grid; place-items:end center; } #sheet > div { width:100%; max-width:520px; background:#2a1c10; border:1px solid #8a6a3a; border-radius:18px 18px 0 0; padding:14px 16px calc(18px + env(safe-area-inset-bottom,0px)); }
+  .crow { display:flex; align-items:center; gap:10px; padding:8px 0; border-bottom:1px solid #5a4226; } .crow:last-child { border-bottom:0; } .crow b { flex:1; } .crow .n { min-width:30px; text-align:center; font-size:22px; font-weight:800; } .crow .n.lethal { color:var(--bad); }
+  .crow button { width:44px; height:40px; padding:0; font-size:20px; }
+  @media (min-width:900px) { #tools { bottom:12px; } #board { height:calc(100dvh - 50px - 52px - 90px); } }
+</style>
+<link rel="stylesheet" href="theme.css?v=5">
+</head>
+<body>
+<main>
+  <section class="panel" id="setup">
+    <b>Nuova partita</b>
+    <div class="row"><span class="msg">Giocatori</span><span class="seg" id="segN"></span></div>
+    <div class="row"><span class="msg">Vita iniziale</span><span class="seg" id="segL"></span></div>
+    <div class="row"><label class="chip" style="display:inline-flex;gap:6px;align-items:center"><input type="checkbox" id="optCmd"> Danno da comandante</label><label class="chip" style="display:inline-flex;gap:6px;align-items:center"><input type="checkbox" id="optFlip"> Giocatori seduti di fronte (capovolgi la met&agrave; in alto)</label></div>
+    <div class="row"><button id="btnGo">Inizia</button></div>
+  </section>
+  <div id="board" hidden></div>
+</main>
+<div id="tools" hidden>
+  <button id="bUndo" aria-label="Annulla">&#8630;</button>
+  <button id="bD6">d6</button><button id="bD20">d20</button><button id="bCoin">Moneta</button><button id="bFirst">Chi inizia</button><button id="bMenu">Nuova</button>
+</div>
+<div id="over" hidden><div><b id="ovB"></b><span id="ovS"></span></div></div>
+<div id="sheet" hidden><div id="shB"></div></div>
+<script src="nav.js?v=3"></script>
+<script src="segnapunti.js?v=1"></script>
+</body>
+</html>

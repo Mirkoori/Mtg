@@ -12,7 +12,7 @@
     { h: 'index.html', l: 'Home', i: 'home', m: ['index.html', '', 'eventi.html'] },
     { h: 'collezione.html', l: 'Collezione', i: 'col', m: ['collezione.html'] },
     { h: 'mazzi.html', l: 'Mazzi', i: 'deck', m: ['mazzi.html'] },
-    { h: 'prova.html', l: 'Prova', i: 'play', m: ['prova.html'] },
+    { h: 'prova.html', l: 'Gioca', i: 'play', m: ['prova.html', 'segnapunti.html'] },
     { h: 'carrello.html', l: 'Mercato', i: 'shop', m: ['carrello.html', 'vendi.html'] }
   ];
   var cur = (location.pathname.split('/').pop() || 'index.html');
@@ -24,6 +24,14 @@
     return '<a href="' + t.h + '"' + (on ? ' class="on" aria-current="page"' : '') + '><svg viewBox="0 0 24 24" aria-hidden="true">' + I[t.i] + '</svg><span>' + t.l + '</span></a>';
   }).join('');
   document.body.insertBefore(nav, document.body.firstChild);
+  if (cur === 'prova.html' || cur === 'segnapunti.html') {
+    var mp = document.querySelector('main');
+    if (mp) {
+      var sp = document.createElement('div'); sp.className = 'subnav';
+      sp.innerHTML = '<a href="prova.html"' + (cur === 'prova.html' ? ' class="on"' : '') + '>Prova mazzo</a><a href="segnapunti.html"' + (cur === 'segnapunti.html' ? ' class="on"' : '') + '>Segnapunti</a>';
+      mp.insertBefore(sp, mp.firstChild);
+    }
+  }
   if (cur === 'carrello.html' || cur === 'vendi.html') {
     var main = document.querySelector('main');
     if (main) {
@@ -31,5 +39,20 @@
       s.innerHTML = '<a href="carrello.html"' + (cur === 'carrello.html' ? ' class="on"' : '') + '>Compra (Carrello)</a><a href="vendi.html"' + (cur === 'vendi.html' ? ' class="on"' : '') + '>Vendi</a>';
       main.insertBefore(s, main.firstChild);
     }
+  }
+  // ---- app installabile
+  var head = document.head;
+  function add(tag, attrs) { var el = document.createElement(tag); Object.keys(attrs).forEach(function (k) { el.setAttribute(k, attrs[k]); }); head.appendChild(el); }
+  if (!document.querySelector('link[rel=manifest]')) {
+    add('link', { rel: 'manifest', href: 'manifest.webmanifest' });
+    add('link', { rel: 'apple-touch-icon', href: 'apple-touch-icon.png' });
+    add('meta', { name: 'apple-mobile-web-app-capable', content: 'yes' });
+    add('meta', { name: 'mobile-web-app-capable', content: 'yes' });
+    add('meta', { name: 'apple-mobile-web-app-title', content: 'myMTG' });
+  }
+  window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault(); window.__inst = e; document.dispatchEvent(new Event('mtg-install')); });
+  window.addEventListener('appinstalled', function () { window.__inst = null; document.dispatchEvent(new Event('mtg-install')); });
+  if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
+    window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js').catch(function () {}); });
   }
 })();

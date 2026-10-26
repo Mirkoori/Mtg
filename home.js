@@ -86,4 +86,7 @@ function renderConflicts() {
   if (!cf.length) return; const b = $('conflBar'); b.hidden = false;
   b.textContent = cf.length + (cf.length === 1 ? ' carta serve' : ' carte servono') + ' in pi\u00f9 mazzi ma non ne hai abbastanza (es. ' + cf[0].name + '). Tocca per vedere.';
 }
+function showInstall() { const b = $('btnInstall'); if (b) b.hidden = !window.__inst || (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches); }
+document.addEventListener('mtg-install', showInstall); showInstall();
+$('btnInstall').onclick = async e => { e.preventDefault(); const ev = window.__inst; if (!ev) return; ev.prompt(); try { await ev.userChoice; } catch (er) {} window.__inst = null; showInstall(); };
 greeting(); renderConflicts(); renderEvents(); renderDecks(); renderCollection(); loadNews();
