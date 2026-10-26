@@ -547,9 +547,10 @@ $('btnExport').onclick = () => {
   // Arena non accetta carte esistenti solo in cartaceo: le riconosco e le tolgo dalla lista
   (async () => {
     try {
-      const es = (d.cards || []).filter(e => S.cards[e.id] && S.cards[e.id].sid); const ids = [...new Set(es.map(e => S.cards[e.id].sid))]; const games = {};
-      for (let i = 0; i < ids.length; i += 75) { const r = await scry('/cards/collection', { identifiers: ids.slice(i, i + 75).map(id => ({ id })) }); (r.data || []).forEach(c => { games[c.id] = c.games || []; }); }
-      const miss = es.filter(e => games[S.cards[e.id].sid] && games[S.cards[e.id].sid].indexOf('arena') < 0);
+      const es = (d.cards || []).filter(e => S.cards[e.id]); const key = e => { const c = S.cards[e.id]; return c.sid || 'n:' + String(c.name).toLowerCase(); }; const games = {};
+      const idents = [], seen = new Set(); es.forEach(e => { const k = key(e); if (seen.has(k)) return; seen.add(k); idents.push(S.cards[e.id].sid ? { id: S.cards[e.id].sid } : { name: S.cards[e.id].name }); });
+      for (let i = 0; i < idents.length; i += 75) { const r = await scry('/cards/collection', { identifiers: idents.slice(i, i + 75) }); (r.data || []).forEach(c => { games[c.id] = c.games || []; games['n:' + String(c.name).toLowerCase()] = c.games || []; }); (r.not_found || []).forEach(n => { if (n && n.name) games['n:' + String(n.name).toLowerCase()] = games['n:' + String(n.name).toLowerCase()] || null; }); }
+      const miss = es.filter(e => games[key(e)] && games[key(e)].indexOf('arena') < 0);
       const skip = new Set();
       for (const e of miss) { const r = await scry('/cards/search?q=' + encodeURIComponent('!"' + S.cards[e.id].name.replace(/"/g, '') + '" game:arena')); if (!(r.data && r.data.length)) skip.add(e.id); }
       if (!skip.size || !$('exTxt')) return;
