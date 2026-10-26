@@ -89,4 +89,42 @@ function renderConflicts() {
 function showInstall() { const b = $('btnInstall'); if (b) b.hidden = !window.__inst || (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches); }
 document.addEventListener('mtg-install', showInstall); showInstall();
 $('btnInstall').onclick = async e => { e.preventDefault(); const ev = window.__inst; if (!ev) return; ev.prompt(); try { await ev.userChoice; } catch (er) {} window.__inst = null; showInstall(); };
-greeting(); renderConflicts(); renderEvents(); renderDecks(); renderCollection(); loadNews();
+function renderValue() {
+  const h = jget('mtg_value_hist', []); const blk = $('valBlk');
+  if (!h.length) { blk.hidden = true; return; } blk.hidden = false;
+  const cur = h[h.length - 1], dayMs = 86400000, t = x => new Date(x.d + 'T12:00:00').getTime();
+  const old = h.filter(x => cur && t(cur) - t(x) >= 7 * dayMs).pop() || (h.length > 1 ? h[0] : null);
+  $('valNow').textContent = money(cur.v);
+  const dl = $('valDelta');
+  if (old && old !== cur) { const d = cur.v - old.v, days = Math.round((t(cur) - t(old)) / dayMs); dl.className = 'vd ' + (Math.abs(d) < 0.005 ? 'fl' : d > 0 ? 'up' : 'dn'); dl.textContent = (d > 0 ? '+' : '') + money(d) + (old.v ? ' (' + (d > 0 ? '+' : '') + (d / old.v * 100).toFixed(1).replace('.', ',') + '%)' : '') + ' in ' + days + (days === 1 ? ' giorno' : ' giorni'); }
+  else { dl.className = 'vd fl'; dl.textContent = 'Il confronto compare dopo qualche giorno di utilizzo.'; }
+  const sp = $('spark');
+  if (h.length > 1) {
+    const vs = h.slice(-90).map(x => x.v), mn = Math.min.apply(null, vs), mx = Math.max.apply(null, vs), r = mx - mn || 1;
+    const pts = vs.map((v, i) => [vs.length === 1 ? 0 : i / (vs.length - 1) * 300, 62 - (v - mn) / r * 54]);
+    const line = pts.map(p => p[0].toFixed(1) + ',' + p[1].toFixed(1)).join(' ');
+    sp.innerHTML = '<polygon points="0,70 ' + line + ' 300,70" fill="rgba(230,184,87,.16)"/><polyline points="' + line + '" fill="none" stroke="#e6b857" stroke-width="2" vector-effect="non-scaling-stroke"/>';
+  } else sp.innerHTML = '';
+  const last = +store.get('mtg_refresh_t') || 0;
+  $('valNote').textContent = 'Prezzi Cardmarket tramite Scryfall' + (last ? ', aggiornati alle ' + new Date(last).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' }) + ' del ' + new Date(last).toLocaleDateString('it-IT', { day: 'numeric', month: 'short' }) : '') + '.';
+  const mv = jget('mtg_movers', null);
+  const rail = (title, list, cls) => list && list.length ? '<div class="mvh">' + title + '</div><div class="rail">' + list.map(x => '<a class="cardx" href="collezione.html"><img loading="lazy" src="' + esc(x.img) + '" alt="' + esc(x.name) + '"><div class="c">' + esc(x.name) + '<div class="mv ' + cls + '">' + money(x.o) + ' \u2192 <b>' + money(x.n) + '</b></div></div></a>').join('') + '</div>' : '';
+  $('movers').innerHTML = mv ? rail('Salite di pi\u00f9 dal ' + new Date(mv.base + 'T12:00:00').toLocaleDateString('it-IT', { day: 'numeric', month: 'short' }), mv.up, 'up') + rail('Scese di pi\u00f9', mv.down, 'dn') : '';
+}
+function renderAlerts() {
+  const al = jget('mtg_alerts', []).filter(a => !a.seen), b = $('banBar');
+  if (!al.length) { b.hidden = true; return; }
+  const w = { banned: 'bandita', not_legal: 'non pi\u00f9 legale', restricted: 'ristretta' };
+  const first = al[0]; b.hidden = false;
+  b.textContent = (al.length === 1 ? '' : al.length + ' carte dei tuoi mazzi hanno cambiato legalit\u00e0. ') + first.card + ' \u00e8 ' + (w[first.to] || first.to) + ' in ' + first.fmt + ' (mazzo ' + first.deck + ').' + (al.length > 1 ? ' Tocca per vedere i mazzi.' : '');
+  b.onclick = () => { const all = jget('mtg_alerts', []); all.forEach(a => { a.seen = true; }); store.set('mtg_alerts', JSON.stringify(all)); };
+}
+async function refreshNow(force) {
+  if (typeof Refresh === 'undefined') return;
+  try { const r = await Refresh.run(force, (d, t) => { if (force) $('btnRef').textContent = 'Aggiorno ' + d + '/' + t + '\u2026'; }); if (r) { await renderCollection(); renderValue(); renderAlerts(); } else if (force) toast('Nessun dato da aggiornare o connessione assente'); }
+  catch (e) { if (force) toast('Aggiornamento non riuscito: riprova tra poco'); }
+  if (force) $('btnRef').textContent = 'Aggiorna ora';
+}
+function toast(t) { let el = $('toast'); el.textContent = t; el.hidden = false; setTimeout(() => { el.hidden = true; }, 2400); }
+$('btnRef').onclick = e => { e.preventDefault(); refreshNow(true); };
+greeting(); renderValue(); renderAlerts(); renderConflicts(); renderEvents(); renderDecks(); renderCollection(); loadNews(); refreshNow(false);
