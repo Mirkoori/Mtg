@@ -88,7 +88,7 @@ $('bD20').onclick = () => overlay(String(rnd(20) + 1), 'dado a 20 facce');
 $('bCoin').onclick = () => overlay(rnd(2) ? 'Testa' : 'Croce', 'moneta');
 $('bFirst').onclick = () => { const i = rnd(G.n); overlay(G.p[i].name, 'inizia per primo'); };
 $('bUndo').onclick = undo;
-$('bMenu').onclick = () => { if (!confirm('Tornare alla scelta della nuova partita? La partita in corso resta salvata finché non ne inizi un’altra.')) return; $('setup').hidden = false; $('board').hidden = true; $('tools').hidden = true; };
+$('bMenu').onclick = () => { if (!confirm('Tornare alla scelta della nuova partita? La partita in corso resta salvata finch\u00e9 non ne inizi un\u2019altra.')) return; $('setup').hidden = false; $('board').hidden = true; $('tools').hidden = true; };
 $('btnGo').onclick = () => { if (G && !$('board').hidden && !confirm('Iniziare una nuova partita?')) return; newGame(); };
 
 let lock = null;
