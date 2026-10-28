@@ -79,6 +79,6 @@
     const box = document.getElementById('setBox'); if (!box) return;
     if (!F.set) { box.hidden = true; Z.code = ''; return; }
     box.hidden = false;
-    if (Z.code !== F.set) { Z.code = F.set; Z.shown = 60; load(F.set); } else paint();
+    const cd = String(F.set).toLowerCase(); if (Z.code !== cd) { Z.code = cd; Z.shown = 60; load(cd); } else paint();
   };
 })();
