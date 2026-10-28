@@ -543,21 +543,37 @@ $('btnExport').onclick = () => {
     <details style="margin-top:10px"><summary>Come importarla in Arena</summary><div class="msg" style="margin-top:6px">Copia la lista, poi in Arena apri <b>Mazzi</b> e premi <b>Importa</b> (in basso a sinistra): il mazzo compare come &laquo;Imported Deck&raquo;.<br>Questo passaggio &egrave; descritto per la versione per computer; non ho trovato conferma che ci sia anche da telefono. Se da telefono non vedi il pulsante Importa, usa Arena sul computer.<br>Arena accetta solo carte che esistono su Arena: quelle assenti vengono segnalate o ignorate.</div></details></div>`;
   $('modal').hidden = false; document.body.classList.add('noscroll');
   const ta = $('exTxt'); ta.onfocus = () => ta.select();
+  // Arena non accetta carte esistenti solo in cartaceo: le riconosco e le tolgo dalla lista.
+  // Finche' il controllo non finisce i pulsanti restano spenti, cosi' non si copia una lista incompleta.
+  const auto = new Set(); let manual = []; try { manual = JSON.parse(store.get('mtg_arena_skip')) || []; } catch (e) { manual = []; }
+  const norm1 = x => String(x || '').trim().toLowerCase();
+  const recompute = () => {
+    const skip = new Set(auto);
+    (d.cards || []).forEach(e => { const c = S.cards[e.id]; if (c && (manual.indexOf(norm1(c.name)) >= 0 || manual.indexOf(norm1(c.name_it)) >= 0)) skip.add(e.id); });
+    txt = Deck.exportText(d, S.cards, skip); const ta2 = $('exTxt'); if (ta2) ta2.value = txt;
+    const names = [...skip].map(id => S.cards[id].name_it || S.cards[id].name), note = $('exNote');
+    if (note) note.innerHTML = names.length ? 'Tolte dalla lista perch\u00e9 Arena non le conosce: <b>' + names.map(esc).join(', ') + '</b>. Il mazzo su Arena avr\u00e0 meno carte.' : '';
+  };
+  const setBusy = b => { ['exCopy', 'exFile', 'exShare'].forEach(id => { const x = $(id); if (x) x.disabled = b; }); const st = $('exChk'); if (st) st.textContent = b ? 'Controllo quali carte esistono su Arena\u2026' : ''; };
+  $('exTxt').insertAdjacentHTML('beforebegin', '<div class="msg" id="exChk"></div><div class="msg" id="exNote" style="color:var(--warn);margin-top:2px"></div>');
+  $('exTxt').insertAdjacentHTML('afterend', '<div class="row" style="margin-top:6px"><input id="exSkipN" type="text" placeholder="Arena rifiuta una carta? Scrivi il nome qui" style="flex:1 1 220px" autocomplete="off"><button id="exSkipB" class="secondary">Togli dalla lista</button></div>');
+  $('exSkipB').onclick = () => {
+    const n = norm1($('exSkipN').value); if (!n) return;
+    if (!(d.cards || []).some(e => { const c = S.cards[e.id]; return c && (norm1(c.name) === n || norm1(c.name_it) === n); })) return toast('Nel mazzo non c\'\u00e8 una carta con questo nome');
+    if (manual.indexOf(n) < 0) manual.push(n); store.set('mtg_arena_skip', JSON.stringify(manual)); $('exSkipN').value = ''; recompute(); toast('Carta tolta');
+  };
   $('exCopy').onclick = () => copyText(txt, 'Lista copiata');
-  // Arena non accetta carte esistenti solo in cartaceo: le riconosco e le tolgo dalla lista
+  setBusy(true); recompute();
   (async () => {
     try {
       const es = (d.cards || []).filter(e => S.cards[e.id]); const key = e => { const c = S.cards[e.id]; return c.sid || 'n:' + String(c.name).toLowerCase(); }; const games = {};
       const idents = [], seen = new Set(); es.forEach(e => { const k = key(e); if (seen.has(k)) return; seen.add(k); idents.push(S.cards[e.id].sid ? { id: S.cards[e.id].sid } : { name: S.cards[e.id].name }); });
-      for (let i = 0; i < idents.length; i += 75) { const r = await scry('/cards/collection', { identifiers: idents.slice(i, i + 75) }); (r.data || []).forEach(c => { games[c.id] = c.games || []; games['n:' + String(c.name).toLowerCase()] = c.games || []; }); (r.not_found || []).forEach(n => { if (n && n.name) games['n:' + String(n.name).toLowerCase()] = games['n:' + String(n.name).toLowerCase()] || null; }); }
+      for (let i = 0; i < idents.length; i += 75) { const r = await scry('/cards/collection', { identifiers: idents.slice(i, i + 75) }); (r.data || []).forEach(c => { games[c.id] = c.games || []; games['n:' + String(c.name).toLowerCase()] = c.games || []; }); }
       const miss = es.filter(e => games[key(e)] && games[key(e)].indexOf('arena') < 0);
-      const skip = new Set();
-      for (const e of miss) { const r = await scry('/cards/search?q=' + encodeURIComponent('!"' + S.cards[e.id].name.replace(/"/g, '') + '" game:arena')); if (!(r.data && r.data.length)) skip.add(e.id); }
-      if (!skip.size || !$('exTxt')) return;
-      txt = Deck.exportText(d, S.cards, skip); $('exTxt').value = txt;
-      const names = [...skip].map(id => S.cards[id].name_it || S.cards[id].name);
-      $('exTxt').insertAdjacentHTML('beforebegin', '<div class="msg" style="color:var(--warn);margin-top:6px">Tolte dalla lista perch\u00e9 non esistono su Arena: <b>' + names.map(esc).join(', ') + '</b>. Il mazzo su Arena avr\u00e0 meno carte.</div>');
-    } catch (e) { /* senza connessione resta la lista completa */ }
+      for (const e of miss) { const r = await scry('/cards/search?q=' + encodeURIComponent('!"' + S.cards[e.id].name.replace(/"/g, '') + '" game:arena')); if (!(r.data && r.data.length)) auto.add(e.id); }
+      recompute();
+    } catch (e) { const c = $('exChk'); if (c) c.textContent = 'Non sono riuscito a controllare le carte su Arena (connessione?). Se Arena ne rifiuta qualcuna, toglila qui sotto.'; }
+    if ($('exCopy')) { const c = $('exChk'), m = c && c.textContent.indexOf('Non sono') === 0; ['exCopy', 'exFile', 'exShare'].forEach(id => { const x = $(id); if (x) x.disabled = false; }); if (c && !m) c.textContent = ''; }
   })();
   $('exFile').onclick = () => { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([txt], { type: 'text/plain' })); a.download = (d.name || 'mazzo').replace(/[^\w\- ]+/g, '').trim().replace(/\s+/g, '_') + '.txt'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 2000); };
   if ($('exShare')) $('exShare').onclick = () => { navigator.share({ title: d.name, text: txt }).catch(() => {}); };
