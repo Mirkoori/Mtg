@@ -3,6 +3,7 @@
 (function () {
   const RAR = [['mythic', 'Mitiche'], ['rare', 'Rare'], ['uncommon', 'Non comuni'], ['common', 'Comuni'], ['special', 'Speciali'], ['bonus', 'Bonus']];
   const SING = { mythic: 'Mitica', rare: 'Rara', uncommon: 'Non comune', common: 'Comune', special: 'Speciale', bonus: 'Bonus' };
+  let ANY = (function () { try { return localStorage.getItem('mtg_setany') !== '0'; } catch (e) { return true; } })();
   const Z = { code: '', data: null, loading: false, err: '', shown: 60, seq: 0 };
   const ttl = 7 * 86400000;
 
@@ -42,14 +43,16 @@
     if (Z.loading) { box.innerHTML = h + '<div class="msg">Carico l\'elenco delle carte dell\'espansione…</div>'; return; }
     if (Z.err) { box.innerHTML = h + '<div class="msg" style="color:var(--bad)">' + esc(Z.err) + ' <button class="link" id="szRetry">Riprova</button></div>'; document.getElementById('szRetry').onclick = () => load(code); return; }
     const d = Z.data; if (!d || !d.cards.length) { box.innerHTML = h + '<div class="msg">Scryfall non ha carte per questa espansione.</div>'; return; }
-    const own = new Set(); C.entries.forEach(e => { const c = C.cards[e.key]; if (c && (c.set || '').toLowerCase() === code) own.add(String(c.name).toLowerCase()); });
-    const by = {}; d.cards.forEach(c => { const k = by[c.r] = by[c.r] || { tot: 0, have: 0, miss: [] }; k.tot++; if (own.has(c.n.toLowerCase())) k.have++; else k.miss.push(c); });
+    const own = new Set(), other = new Set(); C.entries.forEach(e => { const c = C.cards[e.key]; if (!c) return; const nm = String(c.name).toLowerCase(); if ((c.set || '').toLowerCase() === code) own.add(nm); else other.add(nm); });
+    const has = n => own.has(n) || (ANY && other.has(n));
+    const by = {}; d.cards.forEach(c => { const k = by[c.r] = by[c.r] || { tot: 0, have: 0, miss: [] }; k.tot++; if (has(c.n.toLowerCase())) k.have++; else k.miss.push(c); });
     const keys = RAR.map(r => r[0]).filter(k => by[k]);
     const T = keys.reduce((a, k) => ({ tot: a.tot + by[k].tot, have: a.have + by[k].have }), { tot: 0, have: 0 });
     const pct = (a, b) => b ? Math.round(a / b * 100) : 0;
     const bar = (a, b, on) => '<span class="szbar"><span style="width:' + pct(a, b) + '%' + (a >= b ? ';background:var(--ok,#6cd09c)' : '') + '"></span></span>';
     h += '<div class="szrow tot"><span>Totale</span>' + bar(T.have, T.tot) + '<b>' + T.have + '/' + T.tot + '</b><small>' + pct(T.have, T.tot) + '%</small></div>';
     keys.forEach(k => { const x = by[k]; h += '<div class="szrow' + (F.rar === k ? ' on' : '') + '" data-rar="' + k + '"><span>' + esc(RAR.find(r => r[0] === k)[1]) + '</span>' + bar(x.have, x.tot) + '<b>' + x.have + '/' + x.tot + '</b><small>' + (x.tot - x.have ? 'mancano ' + (x.tot - x.have) : '✓') + '</small></div>'; });
+    h += '<label class="chip" style="margin-top:6px;display:inline-flex"><input type="checkbox" id="szAny" ' + (ANY ? 'checked' : '') + '> Conta anche le carte che ho in un\'altra espansione</label>';
     h += '<div class="msg" style="margin-top:4px">Conto le carte diverse (non le copie), senza terre base. Tocca una rarità per vedere solo quelle mancanti.</div>';
     const keysShow = F.rar ? keys.filter(k => k === F.rar) : keys;
     let miss = []; keysShow.forEach(k => by[k].miss.forEach(c => miss.push(c)));
@@ -58,12 +61,13 @@
     if (!miss.length) h += '<div class="msg">Niente da completare: le hai tutte!</div>';
     else {
       h += '<div class="row" style="margin:6px 0"><button id="szCart">Cerca le mancanti su CardTrader</button><button class="secondary" id="szCopy">Copia l\'elenco</button></div>';
-      h += '<div class="szgrid">' + miss.slice(0, Z.shown).map(c => '<div class="szc"><img loading="lazy" src="' + esc(c.img) + '" alt=""><div class="szn">' + esc(d.it[c.n.toLowerCase()] || c.n) + '</div><small>' + (c.eur ? money(c.eur) : '-') + ' · ' + esc(SING[c.r] || c.r)+'</small></div>').join('') + '</div>';
+      h += '<div class="szgrid">' + miss.slice(0, Z.shown).map(c => '<div class="szc"><img loading="lazy" src="' + esc(c.img) + '" alt=""><div class="szn">' + esc(d.it[c.n.toLowerCase()] || c.n) + '</div>' + (other.has(c.n.toLowerCase()) ? '<small style="color:var(--warn)">hai un\'altra stampa</small><br>' : '') + '<small>' + (c.eur ? money(c.eur) : '-') + ' · ' + esc(SING[c.r] || c.r)+'</small></div>').join('') + '</div>';
       if (miss.length > Z.shown) h += '<div class="row" style="justify-content:center"><button class="secondary" id="szMore">Mostra altre (' + (miss.length - Z.shown) + ')</button></div>';
     }
     h += '</details>';
     box.innerHTML = h;
     box.querySelectorAll('[data-rar]').forEach(r => { r.onclick = () => { F.rar = F.rar === r.dataset.rar ? '' : r.dataset.rar; $('fRar').value = F.rar; C.limit = 120; render(); }; });
+    const an = document.getElementById('szAny'); if (an) an.onchange = () => { ANY = an.checked; try { localStorage.setItem('mtg_setany', ANY ? '1' : '0'); } catch (e) { /* ok */ } paint(); };
     const det = document.getElementById('szDet'); if (det) det.ontoggle = () => { Z.open = det.open; };
     const mo = document.getElementById('szMore'); if (mo) mo.onclick = () => { Z.shown += 60; paint(); };
     const lines = miss.map(c => '1 ' + c.n).join('\n');
