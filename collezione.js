@@ -296,6 +296,7 @@ function render() {
   $('more').hidden = shown >= view.length; $('more').textContent = `Mostra altre (${view.length - shown})`;
   document.querySelectorAll('[data-view]').forEach(b => b.classList.toggle('on', b.dataset.view === C.view));
   $('foilChip').classList.toggle('on', F.foil);
+  if (typeof renderSetBox === 'function') renderSetBox();
 }
 
 // ---------- modale
