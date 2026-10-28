@@ -19,7 +19,7 @@
     ov.onclick = close; document.body.appendChild(ov); document.body.style.overflow = 'hidden';
   }
   document.addEventListener('click', ev => {
-    const img = ev.target.closest && ev.target.closest(SEL); if (!img || img.tagName !== 'IMG' || !img.src || img.hidden) return;
+    let img = ev.target.closest && ev.target.closest(SEL); if (!img && ev.target.closest) { const w = ev.target.closest('.szc'); if (w) img = w.querySelector('img'); } if (!img || img.tagName !== 'IMG' || !img.src || img.hidden) return;
     if (/\.svg(\?|$)/.test(img.src) || img.closest('.set')) return; // icone, non carte
     ev.preventDefault(); ev.stopPropagation(); open(img);
   }, true);
