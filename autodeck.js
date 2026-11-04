@@ -156,7 +156,7 @@
       const reg = c => { S.cards[c.id] = Object.assign(S.cards[c.id] || {}, c); return c.id; };
       if (cmdr) Deck.addCard(d, reg(cmdr), 'commander', 1);
       chosen.concat(lands).forEach(x => Deck.addCard(d, reg(x.c), Deck.classify(S.cards[x.c.id]), x.qty));
-      S.decks.push(d); S.cur = d.id; save(); render();
+      S.decks.push(d); S.cur = d.id; save(); window.__fromList = true; location.hash = '#d=' + encodeURIComponent(d.id); render();
       let missN = 0, missEur = 0, haveN = 0;
       chosen.concat(lands).forEach(x => { if (Deck.isBasic(x.c)) return; const ow = Math.min(x.qty, ownedQty(x.c)); haveN += ow; const m = x.qty - ow; missN += m; missEur += m * (x.c.eur || 0); });
       const cnt = Deck.mainCount(d);
@@ -166,7 +166,7 @@
       const li = chosen.concat(lands).map(x => x.c).concat(cmdr ? [cmdr] : []);
       await stratItalian(li.map(c => S.cards[c.id])); save(); render();
     } catch (e) { msg(e.message || 'Qualcosa \u00e8 andato storto.'); }
-    st.busy = false; el('auGo').disabled = false;
+    st.busy = false; if (el('auGo')) el('auGo').disabled = false;
   }
   window.AutoDeck = { mount: ui };
 })();

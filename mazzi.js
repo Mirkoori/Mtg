@@ -75,9 +75,28 @@ function visibleSections(d) {
 
 function ownedQty(c) { return S.owned[(c.name || '').toLowerCase()] || 0; }
 
+const viewId = () => { const x = /^#d=(.+)$/.exec(location.hash); return x ? decodeURIComponent(x[1]) : ''; };
+const artOf = u => u ? String(u).replace(/\/(small|normal|large|png|border_crop)\//, '/art_crop/') : '';
+function goDeck(id) { S.cur = id; save(); window.__fromList = true; location.hash = '#d=' + encodeURIComponent(id); }
+function renderList() {
+  $('deckGrid').innerHTML = S.decks.map(d => {
+    const list = d.cards || [], f = fmtOf(d), st = Deck.stats(Object.assign({ cards: [] }, d), S.cards);
+    const pick = list.find(e => e.section === 'commander' && S.cards[e.id]) || list.filter(e => S.cards[e.id] && !/Land/.test(S.cards[e.id].type || '')).sort((a, b) => (S.cards[b.id].cmc || 0) - (S.cards[a.id].cmc || 0))[0];
+    const c = pick && S.cards[pick.id], full = c && (c.imgBig || c.img || '');
+    const ci = new Set(); list.filter(e => e.section !== 'side').forEach(e => { const k = S.cards[e.id]; if (k) (k.ci || []).forEach(x => ci.add(x)); });
+    const pips = 'WUBRG'.split('').filter(k => ci.has(k)).map(k => `<span class="pip p${k}">${k}</span>`).join('');
+    return `<a class="dk" href="#d=${encodeURIComponent(d.id)}" data-deck="${esc(d.id)}">${full ? `<img loading="lazy" src="${esc(artOf(full))}" data-f="${esc(full)}" onerror="this.onerror=null;this.src=this.dataset.f" alt="">` : ''}<span class="cols">${pips}</span><div class="t"><b>${esc(d.name)}</b><span>${esc(f.name)} \u00b7 ${st.main + (st.commander || 0)}/${f.size + (f.commander ? 1 : 0)} carte</span></div></a>`;
+  }).join('');
+  $('emptyList').hidden = S.decks.length > 0;
+}
 function render() {
+  const vid = viewId(), inEdit = !!vid && S.decks.some(x => x.id === vid);
+  if (inEdit) S.cur = vid;
+  $('listView').hidden = inEdit; $('editor').hidden = !inEdit;
+  if (!inEdit) { renderList(); return; }
   renderDeckBar();
   const d = deck();
+  $('deckTitle').textContent = d ? d.name : '';
   $('empty').hidden = !!d; $('deckArea').hidden = !d;
   if (!d) return;
   renderSummary(d);
@@ -519,7 +538,7 @@ async function doSearch() {
 $('searchForm').onsubmit = ev => { ev.preventDefault(); doSearch(); };
 $('more').onclick = () => { S.shown += 60; renderResults(); };
 
-$('deckSel').onchange = () => { S.cur = $('deckSel').value; save(); render(); };
+$('deckSel').onchange = () => goDeck($('deckSel').value);
 $('fmtSel').onchange = () => { const d = deck(); if (!d) return; d.format = $('fmtSel').value; const f = fmtOf(d);
   if (!f.commander) d.cards.forEach(e => { if (e.section === 'commander') e.section = Deck.classify(S.cards[e.id] || {}); });
   if (!f.side) d.cards.forEach(e => { if (e.section === 'side') e.section = Deck.classify(S.cards[e.id] || {}); });
@@ -527,12 +546,15 @@ $('fmtSel').onchange = () => { const d = deck(); if (!d) return; d.format = $('f
 document.querySelectorAll('[data-view]').forEach(b => b.onclick = () => { S.view = b.dataset.view; store.set('mtg_view', S.view); render(); });
 
 function newDeck(name, format) {
-  const d = Deck.emptyDeck(name, format); S.decks.push(d); S.cur = d.id; save(); render();
+  const d = Deck.emptyDeck(name, format); S.decks.push(d); S.cur = d.id; save(); window.__fromList = true; location.hash = '#d=' + encodeURIComponent(d.id); render();
 }
 $('createForm').onsubmit = ev => { ev.preventDefault(); newDeck($('newName').value.trim() || 'Nuovo mazzo', $('newFmt').value); $('newName').value = ''; $('newBox').open = false; };
 $('btnRename').onclick = () => { const d = deck(); if (!d) return; const n = prompt('Nuovo nome del mazzo', d.name); if (n && n.trim()) { d.name = n.trim(); save(); render(); } };
-$('btnDup').onclick = () => { const d = deck(); if (!d) return; const c = JSON.parse(JSON.stringify(d)); c.id = 'd' + Date.now().toString(36); c.name = d.name + ' (copia)'; S.decks.push(c); S.cur = c.id; save(); render(); };
-$('btnDel').onclick = () => { const d = deck(); if (!d) return; if (!confirm(`Eliminare il mazzo "${d.name}"?`)) return; S.decks = S.decks.filter(x => x.id !== d.id); S.cur = S.decks.length ? S.decks[0].id : ''; save(); render(); };
+document.addEventListener('click', ev => { if (ev.target.closest && ev.target.closest('.dk')) window.__fromList = true; });
+$('btnBack').onclick = () => { if (window.__fromList && history.length > 1) history.back(); else location.hash = ''; };
+window.addEventListener('hashchange', () => { render(); window.scrollTo(0, 0); });
+$('btnDup').onclick = () => { const d = deck(); if (!d) return; const c = JSON.parse(JSON.stringify(d)); c.id = 'd' + Date.now().toString(36); c.name = d.name + ' (copia)'; S.decks.push(c); S.cur = c.id; save(); location.hash = '#d=' + encodeURIComponent(c.id); render(); };
+$('btnDel').onclick = () => { const d = deck(); if (!d) return; if (!confirm(`Eliminare il mazzo "${d.name}"?`)) return; S.decks = S.decks.filter(x => x.id !== d.id); S.cur = S.decks.length ? S.decks[0].id : ''; save(); location.hash = ''; render(); toast('Mazzo eliminato'); };
 $('btnExport').onclick = () => {
   const d = deck(); if (!d) return; let txt = Deck.exportText(d, S.cards);
   const canShare = !!navigator.share;

@@ -75,5 +75,6 @@
   }
   document.addEventListener('keydown', ev => { if (ev.key === 'Escape') close(); });
   const b1 = document.getElementById('btnNew'); if (b1) b1.onclick = open;
+  if (location.hash === '#new') { try { history.replaceState(null, '', location.pathname); } catch (e) { /* ok */ } setTimeout(open, 50); }
   document.addEventListener('click', ev => { if (ev.target.closest && ev.target.closest('#empty .newlink')) open(); });
 })();

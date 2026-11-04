@@ -22,10 +22,10 @@ function renderDecks() {
     const pick = list.find(e => e.section === 'commander' && cards[e.id]) || list.filter(e => cards[e.id] && !/Land/.test(cards[e.id].type || '')).sort((a, b) => (cards[b.id].cmc || 0) - (cards[a.id].cmc || 0))[0];
     const c = pick && cards[pick.id], full = c && (c.imgBig || c.img || '');
     const fmt = (d.format || '').charAt(0).toUpperCase() + (d.format || '').slice(1);
-    return '<a class="deck" href="mazzi.html">' + (full ? '<img loading="lazy" src="' + esc(art(full)) + '" data-f="' + esc(full) + '" onerror="' + IMG_FALL + '" alt="">' : '') +
+    return '<a class="deck" href="mazzi.html#d=' + encodeURIComponent(d.id) + '">' + (full ? '<img loading="lazy" src="' + esc(art(full)) + '" data-f="' + esc(full) + '" onerror="' + IMG_FALL + '" alt="">' : '') +
       '<div class="t"><b>' + esc(d.name || 'Mazzo') + '</b><span>' + esc(fmt) + ' · ' + n + ' carte</span></div></a>';
   });
-  html.push('<a class="deck new" href="mazzi.html"><div>+ Nuovo mazzo<br><small style="font-weight:400;color:#c3aa80">con il coach che ti guida</small></div></a>');
+  html.push('<a class="deck new" href="mazzi.html#new"><div>+ Nuovo mazzo<br><small style="font-weight:400;color:#c3aa80">con il coach che ti guida</small></div></a>');
   $('decks').innerHTML = html.join('');
 }
 async function renderCollection() {
