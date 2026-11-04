@@ -20,7 +20,7 @@ const fmtOf = d => Deck.FORMATS[d.format] || Deck.FORMATS.pioneer;
 const nameOf = c => c.name_it || c.name;
 
 let toastTimer = null;
-function toast(t) { const el = $('toast'); el.textContent = t; el.hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(() => { el.hidden = true; }, 2200); }
+function toast(t, ms) { const el = $('toast'); el.textContent = t; el.hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(() => { el.hidden = true; }, ms || 2200); }
 
 async function searchPages(q, maxPages, order, dir) {
   const p = { q, unique: 'cards', order: order || 'name' }; if (dir) p.dir = dir;

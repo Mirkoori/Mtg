@@ -11,25 +11,22 @@
   const st = { cols: new Set(), themes: new Set(), manual: false, busy: false, sugSeq: 0 };
   const el = id => document.getElementById(id);
 
-  function ui() {
-    const nb = el('newBox'); if (!nb || el('autoBox')) return;
-    const fm = Object.entries(Deck.FORMATS).map(([k, f]) => '<option value="' + k + '"' + (k === 'pioneer' ? ' selected' : '') + '>' + esc(f.name) + '</option>').join('');
+  function ui(box, fmtInit, onDone) {
+    if (!box) return; st.onDone = onDone || null; st.cols = new Set(); st.themes = new Set(); st.manual = false;
+    const fm = Object.entries(Deck.FORMATS).map(([k, f]) => '<option value="' + k + '"' + (k === (fmtInit || 'pioneer') ? ' selected' : '') + '>' + esc(f.name) + '</option>').join('');
     const th = Strategy.THEMES.map(t => '<span class="chip" data-th="' + t.id + '" title="' + esc(t.desc) + '">' + esc(t.name) + '</span>').join('');
     const sty = Object.entries(STYLES).map(([k, s]) => '<option value="' + k + '">' + esc(s.name) + '</option>').join('');
-    const d = document.createElement('details'); d.id = 'autoBox'; d.style.marginTop = '10px';
-    d.innerHTML = '<summary>Crea un mazzo in automatico</summary>' +
-      '<div class="msg" style="margin:6px 0">Scegli i filtri e l\'app compone un mazzo completo. Poi lo rifinisci a mano come qualsiasi altro mazzo.</div>' +
-      '<div class="row"><label class="f" style="flex:1 1 150px">Formato<select id="auFmt">' + fm + '</select></label>' +
-      '<label class="f" style="flex:1 1 150px">Stile<select id="auStyle">' + sty + '</select></label></div>' +
-      '<div class="msg" style="margin-top:8px">Temi (anche pi\u00f9 di uno, fino a 3): i colori migliori li suggerisco io</div><div class="thm" id="auThemes">' + th + '</div>' +
-      '<div class="msg" style="margin-top:8px">Colori <span id="auColHint"></span></div><div class="thm" id="auCols">' + COLS.map(c => '<span class="chip" data-au="' + c[0] + '">' + c[1] + '</span>').join('') + '</div>' +
-      '<div class="row"><label class="f" id="auCmdW" style="flex:2 1 200px" hidden>Comandante (facoltativo)<input id="auCmd" type="text" placeholder="Lascia vuoto per sceglierlo io" autocomplete="off"></label>' +
-      '<label class="f" style="flex:1 1 150px">Carte<select id="auOwn"><option value="prefer">Preferisci le mie</option><option value="only">Solo le mie</option><option value="any">Le pi\u00f9 usate, anche da comprare</option></select></label>' +
-      '<label class="f" style="flex:1 1 120px">Prezzo max per carta (\u20ac)<input id="auBudget" style="width:100%" type="number" min="0" step="0.5" placeholder="nessun limite"></label></div>' +
-      '<div class="row"><button id="auGo">Crea il mazzo</button><span class="msg" id="auMsg"></span></div>';
-    nb.insertAdjacentElement('afterend', d);
-    d.querySelector('#auColHint').insertAdjacentHTML('afterend', '<div id="auSug" class="msg" style="color:var(--accent)"></div>');
-    const sync = () => { const f = Deck.FORMATS[el('auFmt').value]; el('auCmdW').hidden = !f.commander; el('auColHint').textContent = f.commander ? '(con un comandante scelto da te vengono ignorati)' : '(da 1 a 3)'; };
+    const col = COLS.map(c => '<span class="chip" data-au="' + c[0] + '">' + c[1] + '</span>').join('');
+    box.innerHTML = '<div id="autoBox">' +
+      '<div class="wsec"><h4><b>1</b> Formato e stile</h4><div class="row"><label class="f">Formato<select id="auFmt">' + fm + '</select></label><label class="f">Stile di gioco<select id="auStyle">' + sty + '</select></label></div></div>' +
+      '<div class="wsec"><h4><b>2</b> Tema <small>facoltativo, fino a 3</small></h4><div class="thm" id="auThemes">' + th + '</div></div>' +
+      '<div class="wsec"><h4><b>3</b> Colori <small id="auColHint"></small></h4><div id="auSug" class="msg sug"></div><div class="thm" id="auCols">' + col + '</div></div>' +
+      '<details class="wsec"><summary><b>4</b> Altre opzioni <small>carte che possiedi, prezzo, comandante</small></summary>' +
+      '<div class="row"><label class="f" id="auCmdW" hidden>Comandante (se lo scegli tu)<input id="auCmd" type="text" placeholder="Lascia vuoto per sceglierlo io" autocomplete="off"></label>' +
+      '<label class="f">Quali carte usare<select id="auOwn"><option value="prefer">Preferisci le mie</option><option value="only">Solo le mie</option><option value="any">Le pi\u00f9 usate, anche da comprare</option></select></label>' +
+      '<label class="f">Prezzo max per carta (\u20ac)<input id="auBudget" type="number" min="0" step="0.5" placeholder="nessun limite"></label></div></details>' +
+      '<div class="stick"><div class="msg" id="auMsg"></div><button id="auGo">Crea il mazzo</button></div></div>';
+    const sync = () => { const f = Deck.FORMATS[el('auFmt').value]; el('auCmdW').hidden = !f.commander; el('auColHint').textContent = f.commander ? 'con un comandante scelto da te vengono ignorati' : 'da 1 a 3'; };
     el('auFmt').onchange = sync; sync();
     el('auCols').onclick = ev => { const c = ev.target.closest('[data-au]'); if (!c) return; const k = c.dataset.au; st.manual = true; st.cols.has(k) ? st.cols.delete(k) : st.cols.add(k); paintCols(); };
     el('auThemes').onclick = ev => { const c = ev.target.closest('[data-th]'); if (!c) return; const k = c.dataset.th; if (st.themes.has(k)) st.themes.delete(k); else if (st.themes.size < 3) st.themes.add(k); else return msg('Al massimo 3 temi.'); c.classList.toggle('on', st.themes.has(k)); suggest(); };
@@ -165,11 +162,11 @@
       const cnt = Deck.mainCount(d);
       const hasOwned = Object.keys(S.owned).length > 0;
       const t = 'Mazzo creato: ' + cnt + (f.commander ? '/' + size : '/' + size) + ' carte.' + (hasOwned ? ' Ne hai gi\u00e0 ' + haveN + ', ne mancano ' + missN + (missEur ? ' (circa ' + missEur.toLocaleString('it-IT', { style: 'currency', currency: 'EUR' }) + ')' : '') + '.' : '');
-      msg(t); toast('Mazzo creato: rifiniscilo a tuo gusto');
+      msg(t); if (st.onDone) { st.onDone(); toast(t + ' Rifiniscilo a tuo gusto.', 6000); } else toast('Mazzo creato: rifiniscilo a tuo gusto');
       const li = chosen.concat(lands).map(x => x.c).concat(cmdr ? [cmdr] : []);
       await stratItalian(li.map(c => S.cards[c.id])); save(); render();
     } catch (e) { msg(e.message || 'Qualcosa \u00e8 andato storto.'); }
     st.busy = false; el('auGo').disabled = false;
   }
-  ui();
+  window.AutoDeck = { mount: ui };
 })();

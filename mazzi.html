@@ -120,10 +120,11 @@
 <body>
 <main>
   <nav><a href="index.html">Carrello</a><a href="mazzi.html" class="on">Mazzi</a><a href="collezione.html">Collezione</a><a href="vendi.html">Vendi</a><a href="prova.html">Prova</a></nav>
-  <h1>I miei mazzi <small style="font-size:11px;color:var(--muted);font-weight:400">v7</small></h1>
+  <h1>I miei mazzi</h1>
 
   <section>
-    <div class="row" style="margin-top:0">
+    <div class="row" style="margin-top:0"><button id="btnNew" style="flex:1 1 100%;font-size:16px;padding:11px 14px">+ Nuovo mazzo</button></div>
+    <div class="row">
       <select id="deckSel" aria-label="Mazzo"></select>
       <select id="fmtSel" aria-label="Formato"></select>
     </div>
@@ -136,7 +137,7 @@
       <button class="secondary" id="btnDup">Duplica</button>
       <button class="secondary" id="btnDel">Elimina</button>
     </div>
-    <details id="newBox" style="margin-top:10px">
+    <details id="newBox" hidden style="margin-top:10px">
       <summary>Nuovo mazzo</summary>
       <form id="createForm" class="row">
         <input id="newName" type="text" placeholder="Nome del mazzo" style="flex:2 1 180px" autocomplete="off">
@@ -196,7 +197,7 @@
     <div class="row"><button class="secondary" id="more" hidden>Mostra altre</button></div>
   </section>
 
-  <div id="empty">Crea il tuo primo mazzo qui sopra (apri &laquo;Nuovo mazzo&raquo;), scegli il formato e inizia ad aggiungere carte.</div>
+  <div id="empty">Non hai ancora nessun mazzo. Premi <b>+ Nuovo mazzo</b> qui sopra: puoi costruirlo tu, farlo creare in automatico o farti guidare passo passo.</div>
 
   <div id="deckArea" hidden>
     <section id="summary"></section>
@@ -214,6 +215,7 @@
 <script src="strategy.js?v=3"></script>
 <script src="scry.js?v=7"></script>
 <script src="mazzi.js?v=15"></script>
-<script src="autodeck.js?v=2"></script>
+<script src="autodeck.js?v=3"></script>
+<script src="wizard.js?v=1"></script>
 </body>
 </html>
