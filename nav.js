@@ -45,7 +45,8 @@
   function add(tag, attrs) { var el = document.createElement(tag); Object.keys(attrs).forEach(function (k) { el.setAttribute(k, attrs[k]); }); head.appendChild(el); }
   if (!document.querySelector('link[rel=manifest]')) {
     add('link', { rel: 'manifest', href: 'manifest.webmanifest' });
-    add('link', { rel: 'apple-touch-icon', href: 'apple-touch-icon.png' });
+    add('link', { rel: 'icon', type: 'image/png', href: 'icon-192.png?v=2' });
+    add('link', { rel: 'apple-touch-icon', href: 'apple-touch-icon.png?v=2' });
     add('meta', { name: 'apple-mobile-web-app-capable', content: 'yes' });
     add('meta', { name: 'mobile-web-app-capable', content: 'yes' });
     add('meta', { name: 'apple-mobile-web-app-title', content: 'myMTG' });
