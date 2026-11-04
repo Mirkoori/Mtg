@@ -1,0 +1,44 @@
+name: Android build
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: 21 }
+      - run: npm ci
+      - run: npm run build:web
+      - run: npx cap sync android
+      - name: Debug APK (per test sul telefono)
+        working-directory: android
+        run: ./gradlew assembleDebug
+      - uses: actions/upload-artifact@v4
+        with:
+          name: myMTG-debug-apk
+          path: android/app/build/outputs/apk/debug/*.apk
+      - name: Prepara keystore (solo se i secrets sono impostati)
+        id: ks
+        env:
+          KS: ${{ secrets.UPLOAD_KEYSTORE_BASE64 }}
+        run: |
+          if [ -n "$KS" ]; then echo "$KS" | base64 -d > "$RUNNER_TEMP/upload.jks"; echo "ok=true" >> $GITHUB_OUTPUT; fi
+      - name: AAB firmato per Play Store
+        if: steps.ks.outputs.ok == 'true'
+        working-directory: android
+        env:
+          KS_PATH: ${{ runner.temp }}/upload.jks
+          KS_PASS: ${{ secrets.UPLOAD_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.UPLOAD_KEY_ALIAS }}
+          KEY_PASS: ${{ secrets.UPLOAD_KEY_PASSWORD }}
+        run: ./gradlew bundleRelease
+      - uses: actions/upload-artifact@v4
+        if: steps.ks.outputs.ok == 'true'
+        with:
+          name: myMTG-release-aab
+          path: android/app/build/outputs/bundle/release/*.aab

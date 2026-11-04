@@ -1,0 +1,19 @@
+{
+  "name": "mymtg",
+  "version": "1.0.0",
+  "private": true,
+  "description": "myMTG - collezione, mazzi e mercato per Magic: The Gathering (app non ufficiale)",
+  "scripts": {
+    "build:web": "node scripts/build-web.js",
+    "sync": "node scripts/build-web.js && npx cap sync android"
+  },
+  "dependencies": {
+    "@capacitor/android": "^8.6.0",
+    "@capacitor/core": "^8.6.0",
+    "@capacitor/share": "^8.0.3",
+    "@capacitor/status-bar": "^8.0.4"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^8.6.0"
+  }
+}

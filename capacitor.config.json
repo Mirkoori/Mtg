@@ -1,0 +1,13 @@
+{
+  "appId": "com.mirkoori.mymtg",
+  "appName": "myMTG",
+  "webDir": "www",
+  "backgroundColor": "#070605",
+  "android": {
+    "backgroundColor": "#070605",
+    "allowMixedContent": false
+  },
+  "server": {
+    "androidScheme": "https"
+  }
+}

@@ -597,7 +597,7 @@ $('btnExport').onclick = () => {
     } catch (e) { const c = $('exChk'); if (c) c.textContent = 'Non sono riuscito a controllare le carte su Arena (connessione?). Se Arena ne rifiuta qualcuna, toglila qui sotto.'; }
     if ($('exCopy')) { const c = $('exChk'), m = c && c.textContent.indexOf('Non sono') === 0; ['exCopy', 'exFile', 'exShare'].forEach(id => { const x = $(id); if (x) x.disabled = false; }); if (c && !m) c.textContent = ''; }
   })();
-  $('exFile').onclick = () => { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([txt], { type: 'text/plain' })); a.download = (d.name || 'mazzo').replace(/[^\w\- ]+/g, '').trim().replace(/\s+/g, '_') + '.txt'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 2000); };
+  $('exFile').onclick = () => { const C = window.Capacitor; if (C && C.isNativePlatform && C.isNativePlatform() && C.Plugins && C.Plugins.Share) { C.Plugins.Share.share({ title: d.name || 'Mazzo', text: txt, dialogTitle: 'Condividi mazzo' }).catch(() => {}); return; } const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([txt], { type: 'text/plain' })); a.download = (d.name || 'mazzo').replace(/[^\w\- ]+/g, '').trim().replace(/\s+/g, '_') + '.txt'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 2000); };
   if ($('exShare')) $('exShare').onclick = () => { navigator.share({ title: d.name, text: txt }).catch(() => {}); };
 };
 $('btnImport').onclick = () => { $('importBox').hidden = !$('importBox').hidden; };

@@ -53,7 +53,7 @@
   }
   window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault(); window.__inst = e; document.dispatchEvent(new Event('mtg-install')); });
   window.addEventListener('appinstalled', function () { window.__inst = null; document.dispatchEvent(new Event('mtg-install')); });
-  if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
+  if (!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()) && 'serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
     window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js').catch(function () {}); });
   }
 })();
