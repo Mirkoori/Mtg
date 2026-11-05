@@ -263,34 +263,42 @@ async function importList(text, replace) {
   const d = deck(); if (!d) return;
   const items = Deck.parseList(text);
   if (!items.length) return say('importMsg', 'Nessuna carta riconosciuta nel testo.');
-  const names = [...new Set(items.map(i => i.name))];
-  const found = {};
+  const keyOf = i => i.set && i.num ? i.set + '/' + i.num : '';
+  const uniq = new Map(); items.forEach(i => { const k = keyOf(i) || 'n:' + i.name.toLowerCase(); if (!uniq.has(k)) uniq.set(k, i); });
+  const ids = [...uniq.values()];
+  const found = {}, byNum = {};
   say('importMsg', 'Cerco le carte\u2026');
   try {
-    for (let i = 0; i < names.length; i += 75) {
-      const chunk = names.slice(i, i + 75);
-      const r = await scry('/cards/collection', { identifiers: chunk.map(n => ({ name: n })) });
+    for (let i = 0; i < ids.length; i += 75) {
+      const chunk = ids.slice(i, i + 75);
+      const r = await scry('/cards/collection', { identifiers: chunk.map(x => keyOf(x) ? { set: x.set, collector_number: x.num } : { name: x.name }) });
       (r.data || []).forEach(c => {
         const s = slim(c);
+        byNum[(c.set + '/' + c.collector_number).toLowerCase()] = s;
         found[c.name.toLowerCase()] = s;
         (c.card_faces || []).forEach(fc => { if (fc.name) found[fc.name.toLowerCase()] = found[fc.name.toLowerCase()] || s; });
       });
     }
+    const rest = [...new Set(items.filter(i => !(keyOf(i) && byNum[keyOf(i).toLowerCase()]) && !found[i.name.toLowerCase()]).map(i => i.name))];
+    for (let i = 0; i < rest.length; i += 75) {
+      const r = await scry('/cards/collection', { identifiers: rest.slice(i, i + 75).map(n => ({ name: n })) });
+      (r.data || []).forEach(c => { const s = slim(c); found[c.name.toLowerCase()] = s; (c.card_faces || []).forEach(fc => { if (fc.name) found[fc.name.toLowerCase()] = found[fc.name.toLowerCase()] || s; }); });
+    }
   } catch (e) { return say('importMsg', e.message); }
   if (replace) d.cards = [];
-  const miss = []; const ids = [];
+  const miss = []; const idsAdded = [];
   items.forEach(it => {
-    const c = found[it.name.toLowerCase()];
+    const c = (keyOf(it) && byNum[keyOf(it).toLowerCase()]) || found[it.name.toLowerCase()];
     if (!c) { miss.push(it.name); return; }
     S.cards[c.id] = Object.assign(S.cards[c.id] || {}, c);
     const f = fmtOf(d);
     let sec = it.mode === 'commander' && f.commander ? 'commander' : it.mode === 'side' && f.side ? 'side' : Deck.classify(c);
-    Deck.addCard(d, c.id, sec, it.qty); ids.push(c.id);
+    Deck.addCard(d, c.id, sec, it.qty); idsAdded.push(c.id);
   });
   save(); render();
   S.importDone = `Importate ${items.length - miss.length} righe.` + (miss.length ? ` Non trovate: ${miss.slice(0, 8).join(', ')}${miss.length > 8 ? '\u2026' : ''}` : '');
   say('importMsg', S.importDone);
-  enrichItalian([...new Set(ids)]);
+  enrichItalian([...new Set(idsAdded)]);
 }
 function say(id, t) { $(id).textContent = t; }
 

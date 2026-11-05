@@ -215,8 +215,11 @@ const Deck = (() => {
     const m = /^(\d+)\s*x?\s+(.+)$/i.exec(s);
     let qty = 1, name = s;
     if (m) { qty = parseInt(m[1]); name = m[2]; }
-    name = name.replace(/\s+\([A-Za-z0-9]{2,6}\)\s*\S*\s*$/, '').replace(/\s+\*[A-Za-z]\*$/, '').trim();
-    return name ? [{ qty, name, mode }] : [];
+    let set = '', num = '';
+    const sm = /\s+\(([A-Za-z0-9]{2,6})\)\s*(\S*)\s*$/.exec(name);
+    if (sm) { set = sm[1].toLowerCase(); num = sm[2] || ''; name = name.slice(0, sm.index); }
+    name = name.replace(/\s+\*[A-Za-z]\*$/, '').trim();
+    return name ? [{ qty, name, mode, set, num }] : [];
   }
 
   // parole italiane di tipo/sottotipo -> inglese (per cercare per tipo)
