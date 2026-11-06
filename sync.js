@@ -59,6 +59,7 @@
     if (btn) btn.textContent = user ? 'Account' : 'Accedi';
     const m = document.getElementById('acctMsg'); if (m && user) m.textContent = status;
   }
+  function siteUrl() { const C = window.Capacitor; return C && C.isNativePlatform && C.isNativePlatform() ? 'https://mirkoori.github.io/Mtg/' : location.origin + location.pathname.replace(/[^/]*$/, ''); }
   function closeBox() { if (box) { box.remove(); box = null; } }
   function openBox() {
     closeBox();
@@ -70,7 +71,7 @@
     if (user) {
       inner.innerHTML = '<h3 style="margin:0 0 6px">Il tuo account</h3><div style="word-break:break-all">' + (user.email || '') + '</div><div id="acctMsg" style="font-size:13px;opacity:.75;margin:6px 0">' + status + '</div>' +
         '<button id="aSync" style="' + bt + '">Sincronizza ora</button><button id="aOut" style="' + bt2 + '">Esci</button><br>' +
-        '<button id="aDel" style="' + bt2 + ';font-size:13px">Elimina i miei dati online</button>' +
+        '<button id="aDel" style="' + bt2 + ';font-size:13px">Elimina i miei dati online</button><button id="aKill" style="' + bt2 + ';font-size:13px">Elimina il mio account</button>' +
         '<div style="font-size:12px;opacity:.7;margin-top:8px">Online vanno solo mazzi e collezione. Il token Cardtrader resta su questo dispositivo.</div>';
     } else {
       inner.innerHTML = '<h3 style="margin:0 0 6px">Accedi</h3><div style="font-size:13px;opacity:.75">Con un account ritrovi mazzi e collezione su ogni dispositivo.</div>' +
@@ -84,6 +85,11 @@
     if (user) {
       q('aSync').onclick = async () => { try { status = 'Sincronizzo...'; paint(); if (dirty()) await push(); else await pull(); } catch (e) { status = 'Errore: ' + (e.message || e); } paint(); };
       q('aOut').onclick = async () => { await sb.auth.signOut(); user = null; closeBox(); paint(); };
+      q('aKill').onclick = async () => {
+        if (!confirm('Eliminare definitivamente il tuo account e tutti i dati salvati online? Quelli su questo dispositivo restano. L\'operazione non si pu\u00f2 annullare.')) return;
+        const r = await sb.rpc('delete_my_account'); if (r.error) { status = 'Errore: ' + r.error.message; paint(); return; }
+        try { await sb.auth.signOut(); } catch (e) {} user = null; lrem('mtg_sync_last'); closeBox(); paint();
+      };
       q('aDel').onclick = async () => {
         if (!confirm('Eliminare mazzi e collezione salvati online? Quelli su questo dispositivo restano.')) return;
         const r = await sb.from('user_data').delete().in('key', KEYS); status = r.error ? 'Errore: ' + r.error.message : 'Dati online eliminati'; lrem('mtg_sync_last'); paint();
@@ -93,11 +99,11 @@
       q('aIn').onclick = async () => { msg('Accedo...'); const r = await sb.auth.signInWithPassword(cred()); if (r.error) return msg('Non riesco ad accedere: ' + r.error.message); };
       q('aUp').onclick = async () => {
         const c = cred(); if (!c.email || c.password.length < 6) return msg('Scrivi email e una password di almeno 6 caratteri.');
-        msg('Creo l\'account...'); c.options = { emailRedirectTo: location.origin + location.pathname.replace(/[^/]*$/, '') };
+        msg('Creo l\'account...'); c.options = { emailRedirectTo: siteUrl() };
         const r = await sb.auth.signUp(c); if (r.error) return msg('Errore: ' + r.error.message);
         if (!r.data.session) msg('Ti ho mandato una email: aprila e conferma, poi torna qui e accedi.');
       };
-      q('aRes').onclick = async () => { const m = q('aMail').value.trim(); if (!m) return msg('Scrivi prima la tua email.'); const r = await sb.auth.resetPasswordForEmail(m, { redirectTo: location.origin + location.pathname.replace(/[^/]*$/, '') }); msg(r.error ? 'Errore: ' + r.error.message : 'Ti ho mandato una email per cambiare la password.'); };
+      q('aRes').onclick = async () => { const m = q('aMail').value.trim(); if (!m) return msg('Scrivi prima la tua email.'); const r = await sb.auth.resetPasswordForEmail(m, { redirectTo: siteUrl() }); msg(r.error ? 'Errore: ' + r.error.message : 'Ti ho mandato una email per cambiare la password.'); };
     }
   }
   function mount() {
