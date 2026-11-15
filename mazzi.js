@@ -284,6 +284,15 @@ async function importList(text, replace) {
       const r = await scry('/cards/collection', { identifiers: rest.slice(i, i + 75).map(n => ({ name: n })) });
       (r.data || []).forEach(c => { const s = slim(c); found[c.name.toLowerCase()] = s; (c.card_faces || []).forEach(fc => { if (fc.name) found[fc.name.toLowerCase()] = found[fc.name.toLowerCase()] || s; }); });
     }
+    const rest2 = rest.filter(n => !found[n.toLowerCase()]);
+    for (const n of rest2) {
+      for (const q of ['lang:it !"' + n.replace(/"/g, '') + '"', 'lang:it "' + n.replace(/"/g, '') + '"', '"' + n.replace(/"/g, '') + '"']) {
+        let r; try { r = await scry('/cards/search?unique=prints&q=' + encodeURIComponent(q)); } catch (e) { r = { data: [] }; }
+        const list = r.data || [];
+        const c = list.find(x => (x.printed_name || '').toLowerCase() === n.toLowerCase()) || (q.indexOf('lang:it') === 0 ? list[0] : null);
+        if (c) { found[n.toLowerCase()] = slim(c); break; }
+      }
+    }
   } catch (e) { return say('importMsg', e.message); }
   if (replace) d.cards = [];
   const miss = []; const idsAdded = [];
